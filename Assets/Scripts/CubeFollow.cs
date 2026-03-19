@@ -2,6 +2,8 @@ using UnityEngine;
 
 public class CubeFollow : MonoBehaviour
 {
+    public Transform target;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -22,7 +24,7 @@ public class CubeFollow : MonoBehaviour
             new Vector3(poseMatrix.m02, poseMatrix.m12, poseMatrix.m22),
             new Vector3(poseMatrix.m01, poseMatrix.m11, poseMatrix.m21)
         );
-        transform.position = position;
-        transform.rotation = rotation;
+        transform.localPosition = target.position + position;
+        transform.localRotation = rotation * target.rotation;
     }
 }

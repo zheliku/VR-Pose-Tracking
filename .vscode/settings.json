@@ -25,5 +25,12 @@
         "*.sln": "*.csproj"
     },
     "dotnet.defaultSolution": "VR Pose Tracking.slnx",
-    "python-envs.defaultEnvManager": "ms-python.python:system"
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python-envs.pythonProjects": [
+        {
+            "path": "Foundationpose_for_VR",
+            "envManager": "ms-python.python:system",
+            "packageManager": "ms-python.python:pip"
+        }
+    ]
 }
