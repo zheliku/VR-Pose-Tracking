@@ -588,7 +588,7 @@ GameObject:
   - component: {fileID: 1450599165}
   - component: {fileID: 1450599167}
   m_Layer: 0
-  m_Name: RGBDPayloadReceiver
+  m_Name: PayloadReceiver
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -601,14 +601,11 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1450599164}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 855a209d6440af8459a5d695afaabca9, type: 3}
+  m_Script: {fileID: 11500000, guid: a72dceb1517058b45ab699f91dc4c126, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RGBDPayloadReceiver
-  serverIP: 172.24.245.115
-  serverPort: 5556
-  topic: rgbd
+  m_EditorClassIdentifier: Assembly-CSharp::RGBDDecoder
   OnImageReceived:
     m_PersistentCalls:
       m_Calls:
@@ -663,33 +660,22 @@ MonoBehaviour:
   m_GameObject: {fileID: 1450599164}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 855a209d6440af8459a5d695afaabca9, type: 3}
+  m_Script: {fileID: 11500000, guid: 7b7c534cc96038148a1fb67d64000e74, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RGBDPayloadReceiver
+  m_EditorClassIdentifier: Assembly-CSharp::PayloadReceiver
   serverIP: 127.0.0.1
   serverPort: 5556
+  useTopic: 1
   topic: rgbd
-  OnImageReceived:
+  OnServerIPChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  OnPayloadReceived:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1402077187}
-        m_TargetAssemblyTypeName: ImageViewer, Assembly-CSharp
-        m_MethodName: OnImageReceived
-        m_Mode: 0
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
-  OnDepthReceived:
-    m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 1132491153}
-        m_TargetAssemblyTypeName: ImageViewer, Assembly-CSharp
-        m_MethodName: OnImageReceived
+      - m_Target: {fileID: 1450599165}
+        m_TargetAssemblyTypeName: RGBDDecoder, Assembly-CSharp
+        m_MethodName: OnPayloadReceived
         m_Mode: 0
         m_Arguments:
           m_ObjectArgument: {fileID: 0}

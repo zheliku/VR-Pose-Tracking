@@ -1,8 +1,15 @@
 using System.Collections;
+using Meta.XR;
 using UnityEngine;
 using UnityEngine.UI;
-using Meta.XR;
 
+/// <summary>
+/// Quest 相机纹理显示管理器。
+///
+/// 用途：
+/// - 等待左右 Passthrough 相机可用。
+/// - 将左右纹理绑定到 UI RawImage，便于本地可视化联调。
+/// </summary>
 public class CameraViewerManager : MonoBehaviour
 {
     [SerializeField]
@@ -18,7 +25,9 @@ public class CameraViewerManager : MonoBehaviour
     private Texture _leftCameraTexture;
     private Texture _rightCameraTexture;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    /// <summary>
+    /// 协程启动：持续等待相机准备完成后再绑定 UI 纹理。
+    /// </summary>
     IEnumerator Start()
     {
         while (!TryGetCameraAccess())
@@ -26,10 +35,14 @@ public class CameraViewerManager : MonoBehaviour
             yield return null;
         }
 
-        _leftImage.texture  = _leftCameraTexture;
+        _leftImage.texture = _leftCameraTexture;
         _rightImage.texture = _rightCameraTexture;
     }
 
+    /// <summary>
+    /// 尝试获取左右相机纹理。
+    /// 返回 true 表示已经可以用于显示。
+    /// </summary>
     private bool TryGetCameraAccess()
     {
         if (!_leftCameraAccess || !_leftCameraAccess.IsPlaying || !_rightCameraAccess || !_rightCameraAccess.IsPlaying)
@@ -42,7 +55,7 @@ public class CameraViewerManager : MonoBehaviour
             return true;
         }
 
-        _leftCameraTexture  = _leftCameraAccess.GetTexture();
+        _leftCameraTexture = _leftCameraAccess.GetTexture();
         _rightCameraTexture = _rightCameraAccess.GetTexture();
 
         if (_leftCameraTexture)

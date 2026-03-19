@@ -236,7 +236,7 @@ GameObject:
   - component: {fileID: 406805256}
   - component: {fileID: 406805258}
   m_Layer: 0
-  m_Name: TrackingPayloadReceiver
+  m_Name: PayloadReceiver
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -249,14 +249,11 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 406805255}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 53c426a2e9cc37a4fb762c1667702954, type: 3}
+  m_Script: {fileID: 11500000, guid: 70d40ef6a8309104989ec9449b61ad2c, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TrackingPayloadReceiver
-  serverIP: 172.24.244.81
-  serverPort: 5556
-  topic: tracking
+  m_EditorClassIdentifier: Assembly-CSharp::TrackingDecoder
   OnImageReceived:
     m_PersistentCalls:
       m_Calls:
@@ -317,18 +314,22 @@ MonoBehaviour:
   m_GameObject: {fileID: 406805255}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 53c426a2e9cc37a4fb762c1667702954, type: 3}
+  m_Script: {fileID: 11500000, guid: 7b7c534cc96038148a1fb67d64000e74, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TrackingPayloadReceiver
+  m_EditorClassIdentifier: Assembly-CSharp::PayloadReceiver
   serverIP: 127.0.0.1
   serverPort: 5556
+  useTopic: 1
   topic: tracking
-  OnImageReceived:
+  OnServerIPChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  OnPayloadReceived:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 518146295}
-        m_TargetAssemblyTypeName: ImageViewer, Assembly-CSharp
-        m_MethodName: OnImageReceived
+      - m_Target: {fileID: 406805256}
+        m_TargetAssemblyTypeName: TrackingDecoder, Assembly-CSharp
+        m_MethodName: OnPayloadReceived
         m_Mode: 0
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -338,27 +339,6 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-  OnPoseReceived:
-    m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 1040213272}
-        m_TargetAssemblyTypeName: CubeFollow, Assembly-CSharp
-        m_MethodName: FollowTarget
-        m_Mode: 0
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
-  OnTrackingStarted:
-    m_PersistentCalls:
-      m_Calls: []
-  OnTrackingLost:
-    m_PersistentCalls:
-      m_Calls: []
 --- !u!1 &427779727
 GameObject:
   m_ObjectHideFlags: 0

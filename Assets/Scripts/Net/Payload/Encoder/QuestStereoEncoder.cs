@@ -1,7 +1,17 @@
 using Meta.XR;
 using UnityEngine;
 
-public class QuestStereoPayloadEncoder : PayloadEncoderBase
+/// <summary>
+/// Quest 双目图像编码器。
+///
+/// 输入：左右 Passthrough Camera 纹理。
+/// 输出：multipart [left_jpg, right_jpg]。
+///
+/// 注意：
+/// - 本组件只负责编码，不负责发送。
+/// - 发送节奏由 PayloadSender 控制。
+/// </summary>
+public class QuestStereoEncoder : EncoderBase
 {
     [SerializeField] private PassthroughCameraAccess leftCameraAccess;
     [SerializeField] private PassthroughCameraAccess rightCameraAccess;
@@ -13,6 +23,9 @@ public class QuestStereoPayloadEncoder : PayloadEncoderBase
     private Texture2D _leftReadbackTexture;
     private Texture2D _rightReadbackTexture;
 
+    /// <summary>
+    /// 从 Quest 左右相机抓取当前帧并编码为 JPEG 双帧 payload。
+    /// </summary>
     public override bool TryEncodePayload(out byte[][] payloadParts)
     {
         payloadParts = null;
@@ -49,6 +62,9 @@ public class QuestStereoPayloadEncoder : PayloadEncoderBase
         return true;
     }
 
+    /// <summary>
+    /// 确保左右采集缓冲区尺寸与源纹理一致。
+    /// </summary>
     private void EnsureCaptureBuffers(Texture leftTexture, Texture rightTexture)
     {
         EnsureBuffer(ref _leftRenderTexture, ref _leftReadbackTexture, leftTexture.width, leftTexture.height);
@@ -78,6 +94,9 @@ public class QuestStereoPayloadEncoder : PayloadEncoderBase
         readbackTexture = new Texture2D(width, height, TextureFormat.RGB24, false);
     }
 
+    /// <summary>
+    /// 将 source 纹理复制到 RenderTexture，再回读并编码为 JPEG。
+    /// </summary>
     private byte[] CaptureAsJpeg(Texture source, RenderTexture target, Texture2D readbackTexture)
     {
         if (source == null || target == null || readbackTexture == null)
@@ -96,6 +115,9 @@ public class QuestStereoPayloadEncoder : PayloadEncoderBase
         return readbackTexture.EncodeToJPG(jpegQuality);
     }
 
+    /// <summary>
+    /// 释放一侧采集缓冲资源。
+    /// </summary>
     private void ReleaseBuffer(ref RenderTexture renderTexture, ref Texture2D readbackTexture)
     {
         if (renderTexture != null)
@@ -112,6 +134,9 @@ public class QuestStereoPayloadEncoder : PayloadEncoderBase
         }
     }
 
+    /// <summary>
+    /// 对象销毁时释放左右缓冲资源，防止纹理泄漏。
+    /// </summary>
     private void OnDestroy()
     {
         ReleaseBuffer(ref _leftRenderTexture, ref _leftReadbackTexture);

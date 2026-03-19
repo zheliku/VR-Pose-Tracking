@@ -1,6 +1,15 @@
 using UnityEngine;
 
-public class StaticStereoPayloadEncoder : PayloadEncoderBase
+/// <summary>
+/// 静态双图编码器（用于联调与回归测试）。
+///
+/// 输入：Inspector 指定的左右纹理。
+/// 输出：multipart [left_jpg, right_jpg]。
+///
+/// 设计点：
+/// - 当输入纹理未变化时复用已编码 JPEG，减少重复编码开销。
+/// </summary>
+public class StaticStereoEncoder : EncoderBase
 {
     [SerializeField] private Texture leftTexture;
     [SerializeField] private Texture rightTexture;
@@ -12,6 +21,9 @@ public class StaticStereoPayloadEncoder : PayloadEncoderBase
     private byte[] _cachedLeftJpeg;
     private byte[] _cachedRightJpeg;
 
+    /// <summary>
+    /// 编码当前静态纹理为双帧 payload。
+    /// </summary>
     public override bool TryEncodePayload(out byte[][] payloadParts)
     {
         payloadParts = null;
@@ -39,6 +51,9 @@ public class StaticStereoPayloadEncoder : PayloadEncoderBase
         return true;
     }
 
+    /// <summary>
+    /// 将单张纹理编码为 JPEG 字节。
+    /// </summary>
     private byte[] EncodeTextureToJpeg(Texture source)
     {
         if (source == null || source.width <= 0 || source.height <= 0)
