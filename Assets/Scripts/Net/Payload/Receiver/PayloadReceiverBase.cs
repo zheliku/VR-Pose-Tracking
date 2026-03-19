@@ -1,90 +1,45 @@
-/*
- * 位姿追踪数据接收器
- *
- * 负责网络接收与事件分发，具体 payload 协议解析由 ITrackingPayloadParser 实现。
- * 当前默认解析器：TrackingPayloadParser（phase + color + pose_json）。
- */
-
 using System;
 using System.Diagnostics;
 using System.Threading;
 using NetMQ;
 using NetMQ.Sockets;
 using UnityEngine;
-using UnityEngine.Events;
 using Debug = UnityEngine.Debug;
 
-/// <summary>
-/// 追踪阶段枚举
-/// </summary>
-public enum TrackingPhase
+public abstract class PayloadReceiverBase : MonoBehaviour
 {
-    Detecting = 0,
-    Tracking = 1
-}
-
-/// <summary>
-/// 位姿追踪数据接收器
-/// </summary>
-public class PoseDataReceiver : MonoBehaviour
-{
-    private const string ServerIPPrefKey = "PoseDataReceiver.ServerIP";
-
     [Header("Network Settings")]
-    [SerializeField] private string serverIP = "127.0.0.1";
-    [SerializeField] private int serverPort = 5556;
-    [SerializeField] private string topic = "tracking";
-
-    [Header("Events")]
-    [Tooltip("当收到图像数据时触发")]
-    public RawDataEvent OnImageReceived = new RawDataEvent();
-
-    [Tooltip("当收到位姿数据时触发")]
-    public PoseDataEvent OnPoseReceived = new PoseDataEvent();
-
-    [Tooltip("当从检测切换到追踪时触发")]
-    public UnityEvent OnTrackingStarted = new UnityEvent();
-
-    [Tooltip("当追踪丢失时触发")]
-    public UnityEvent OnTrackingLost = new UnityEvent();
+    [SerializeField] protected string serverIP = "127.0.0.1";
+    [SerializeField] protected int serverPort = 5556;
+    [SerializeField] protected string topic = string.Empty;
 
     private SubscriberSocket _socket;
     private Thread _receiveThread;
     private volatile bool _running;
-
-    private readonly object _lock = new object();
-    private readonly ITrackingPayloadParser _payloadParser = new TrackingPayloadParser();
     private readonly Stopwatch _stopwatch = new Stopwatch();
 
-    private RawData _latestImageData;
-    private PoseData _latestPoseData;
-    private TrackingPhase _latestPhase;
-    private bool _hasNewData;
-    private TrackingPhase _lastPhase = TrackingPhase.Detecting;
+    protected abstract string ServerIPPreferenceKey { get; }
+    protected virtual string DefaultTopic => "payload";
+    protected virtual string LogPrefix => $"[{GetType().Name}]";
 
     public bool IsConnected => _running && _socket != null;
     public string ServerAddress => $"tcp://{serverIP}:{serverPort}";
-    public TrackingPhase CurrentPhase => _lastPhase;
     public string CurrentServerIP => serverIP;
 
     public event Action<string> ServerIPChanged;
 
-    private void Awake()
+    protected virtual void Awake()
     {
-        if (OnImageReceived == null)
-            OnImageReceived = new RawDataEvent();
-        if (OnPoseReceived == null)
-            OnPoseReceived = new PoseDataEvent();
-        if (OnTrackingStarted == null)
-            OnTrackingStarted = new UnityEvent();
-        if (OnTrackingLost == null)
-            OnTrackingLost = new UnityEvent();
+        if (string.IsNullOrWhiteSpace(topic))
+        {
+            topic = DefaultTopic;
+        }
 
         LoadServerIPFromPrefs();
         NotifyServerIPChanged();
     }
 
-    private void Start()
+    protected virtual void Start()
     {
         if (!_stopwatch.IsRunning)
         {
@@ -99,11 +54,11 @@ public class PoseDataReceiver : MonoBehaviour
         string normalizedIP = NormalizeServerIP(newServerIP);
         if (!IsValidServerAddress(normalizedIP))
         {
-            Debug.LogWarning($"[PoseDataReceiver] Invalid server IP/host: '{newServerIP}'");
+            Debug.LogWarning($"{LogPrefix} Invalid server IP/host: '{newServerIP}'");
             return false;
         }
 
-        PlayerPrefs.SetString(ServerIPPrefKey, normalizedIP);
+        PlayerPrefs.SetString(ServerIPPreferenceKey, normalizedIP);
         PlayerPrefs.Save();
         return true;
     }
@@ -113,7 +68,7 @@ public class PoseDataReceiver : MonoBehaviour
         string normalizedIP = NormalizeServerIP(newServerIP);
         if (!IsValidServerAddress(normalizedIP))
         {
-            Debug.LogWarning($"[PoseDataReceiver] Invalid server IP/host: '{newServerIP}'");
+            Debug.LogWarning($"{LogPrefix} Invalid server IP/host: '{newServerIP}'");
             return false;
         }
 
@@ -138,13 +93,13 @@ public class PoseDataReceiver : MonoBehaviour
         }
 
         NotifyServerIPChanged();
-        Debug.Log($"[PoseDataReceiver] Server switched to {ServerAddress}");
+        Debug.Log($"{LogPrefix} Server switched to {ServerAddress}");
         return true;
     }
 
     public string GetSavedServerIP()
     {
-        return NormalizeServerIP(PlayerPrefs.GetString(ServerIPPrefKey, string.Empty));
+        return NormalizeServerIP(PlayerPrefs.GetString(ServerIPPreferenceKey, string.Empty));
     }
 
     public void ApplySavedServerIP()
@@ -175,7 +130,7 @@ public class PoseDataReceiver : MonoBehaviour
         _receiveThread = new Thread(ReceiveLoop) { IsBackground = true };
         _receiveThread.Start();
 
-        Debug.Log($"[PoseDataReceiver] Connected to {ServerAddress}, topic: {topic}");
+        Debug.Log($"{LogPrefix} Connected to {ServerAddress}, topic: {topic}");
     }
 
     public void Disconnect()
@@ -189,33 +144,10 @@ public class PoseDataReceiver : MonoBehaviour
         _receiveThread = null;
 
         DisconnectSocket();
-        Debug.Log("[PoseDataReceiver] Disconnected");
+        Debug.Log($"{LogPrefix} Disconnected");
     }
 
-    private void Update()
-    {
-        lock (_lock)
-        {
-            if (!_hasNewData)
-            {
-                return;
-            }
-
-            if (_lastPhase == TrackingPhase.Detecting && _latestPhase == TrackingPhase.Tracking)
-            {
-                OnTrackingStarted?.Invoke();
-            }
-            else if (_lastPhase == TrackingPhase.Tracking && _latestPhase == TrackingPhase.Detecting)
-            {
-                OnTrackingLost?.Invoke();
-            }
-            _lastPhase = _latestPhase;
-
-            OnImageReceived?.Invoke(_latestImageData);
-            OnPoseReceived?.Invoke(_latestPoseData);
-            _hasNewData = false;
-        }
-    }
+    protected abstract void HandlePayload(byte[][] payloadParts, double timestampMs);
 
     private void ReceiveLoop()
     {
@@ -247,24 +179,13 @@ public class PoseDataReceiver : MonoBehaviour
                 }
 
                 double timestampMs = _stopwatch.Elapsed.TotalMilliseconds;
-                if (!_payloadParser.TryParse(payloadParts, timestampMs, out TrackingPayload parsedPayload))
-                {
-                    continue;
-                }
-
-                lock (_lock)
-                {
-                    _latestImageData = parsedPayload.ImageData;
-                    _latestPoseData = parsedPayload.PoseData;
-                    _latestPhase = parsedPayload.Phase;
-                    _hasNewData = true;
-                }
+                HandlePayload(payloadParts, timestampMs);
             }
             catch (Exception e)
             {
                 if (_running)
                 {
-                    Debug.LogError($"[PoseDataReceiver] Error: {e.Message}");
+                    Debug.LogError($"{LogPrefix} Error: {e.Message}");
                 }
             }
         }
@@ -284,7 +205,7 @@ public class PoseDataReceiver : MonoBehaviour
 
     private void LoadServerIPFromPrefs()
     {
-        string savedIP = NormalizeServerIP(PlayerPrefs.GetString(ServerIPPrefKey, string.Empty));
+        string savedIP = NormalizeServerIP(PlayerPrefs.GetString(ServerIPPreferenceKey, string.Empty));
         if (IsValidServerAddress(savedIP))
         {
             serverIP = savedIP;
@@ -293,7 +214,7 @@ public class PoseDataReceiver : MonoBehaviour
 
     private void SaveServerIPToPrefs()
     {
-        PlayerPrefs.SetString(ServerIPPrefKey, serverIP);
+        PlayerPrefs.SetString(ServerIPPreferenceKey, serverIP);
         PlayerPrefs.Save();
     }
 
@@ -317,19 +238,14 @@ public class PoseDataReceiver : MonoBehaviour
         return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
     }
 
-    private void Cleanup()
+    protected virtual void OnDestroy()
     {
         Disconnect();
-    }
-
-    private void OnDestroy()
-    {
-        Cleanup();
         NetMQConfig.Cleanup(false);
     }
 
-    private void OnApplicationQuit()
+    protected virtual void OnApplicationQuit()
     {
-        Cleanup();
+        Disconnect();
     }
 }

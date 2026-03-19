@@ -1,7 +1,7 @@
 using Meta.XR;
 using UnityEngine;
 
-public class QuestPassthroughStereoProvider : NetMQPayloadProviderBase
+public class QuestStereoPayloadEncoder : PayloadEncoderBase
 {
     [SerializeField] private PassthroughCameraAccess leftCameraAccess;
     [SerializeField] private PassthroughCameraAccess rightCameraAccess;
@@ -13,7 +13,7 @@ public class QuestPassthroughStereoProvider : NetMQPayloadProviderBase
     private Texture2D _leftReadbackTexture;
     private Texture2D _rightReadbackTexture;
 
-    public override bool TryGetPayload(out byte[][] payloadParts)
+    public override bool TryEncodePayload(out byte[][] payloadParts)
     {
         payloadParts = null;
 

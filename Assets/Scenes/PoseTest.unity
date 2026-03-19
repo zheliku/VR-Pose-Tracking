@@ -236,7 +236,7 @@ GameObject:
   - component: {fileID: 406805256}
   - component: {fileID: 406805258}
   m_Layer: 0
-  m_Name: PoseDataReceiver
+  m_Name: TrackingPayloadReceiver
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -253,7 +253,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 53c426a2e9cc37a4fb762c1667702954, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PoseDataReceiver
+  m_EditorClassIdentifier: Assembly-CSharp::TrackingPayloadReceiver
   serverIP: 172.24.244.81
   serverPort: 5556
   topic: tracking
@@ -319,7 +319,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 53c426a2e9cc37a4fb762c1667702954, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PoseDataReceiver
+  m_EditorClassIdentifier: Assembly-CSharp::TrackingPayloadReceiver
   serverIP: 127.0.0.1
   serverPort: 5556
   topic: tracking

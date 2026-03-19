@@ -588,7 +588,7 @@ GameObject:
   - component: {fileID: 1450599165}
   - component: {fileID: 1450599167}
   m_Layer: 0
-  m_Name: RGBDReceiver
+  m_Name: RGBDPayloadReceiver
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -605,7 +605,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 855a209d6440af8459a5d695afaabca9, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RGBDReceiver
+  m_EditorClassIdentifier: Assembly-CSharp::RGBDPayloadReceiver
   serverIP: 172.24.245.115
   serverPort: 5556
   topic: rgbd
@@ -665,7 +665,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 855a209d6440af8459a5d695afaabca9, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RGBDReceiver
+  m_EditorClassIdentifier: Assembly-CSharp::RGBDPayloadReceiver
   serverIP: 127.0.0.1
   serverPort: 5556
   topic: rgbd

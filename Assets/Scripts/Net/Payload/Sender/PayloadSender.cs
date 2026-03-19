@@ -1,22 +1,15 @@
-/*
- * Quest 双目图像发送器
- *
- * 从 Meta XR Passthrough 左右相机获取图像，压缩为 JPEG 后通过 NetMQ Push 发送到 Python 端。
- * 消息格式：multipart [left_jpg, right_jpg]
- */
-
 using System;
 using System.Collections;
 using NetMQ;
 using NetMQ.Sockets;
 using UnityEngine;
 
-public class NetMQPayloadSender : MonoBehaviour
+public class PayloadSender : MonoBehaviour
 {
-    private const string ServerIPPrefKey = "NetMQPayloadSender.ServerIP";
+    private const string ServerIPPrefKey = "PayloadSender.ServerIP";
 
-    [Header("Data Provider")]
-    [SerializeField] private NetMQPayloadProviderBase payloadProvider;
+    [Header("Data Encoder")]
+    [SerializeField] private PayloadEncoderBase payloadEncoder;
 
     [Header("Network")]
     [SerializeField] private string serverIP = "127.0.0.1";
@@ -40,18 +33,18 @@ public class NetMQPayloadSender : MonoBehaviour
     private void Awake()
     {
         LoadServerIPFromPrefs();
-        if (payloadProvider == null)
+        if (payloadEncoder == null)
         {
-            payloadProvider = GetComponent<NetMQPayloadProviderBase>();
+            payloadEncoder = GetComponent<PayloadEncoderBase>();
         }
         NotifyServerIPChanged();
     }
 
     private IEnumerator Start()
     {
-        if (payloadProvider == null)
+        if (payloadEncoder == null)
         {
-            Debug.LogError("[NetMQPayloadSender] Payload provider is not assigned.");
+            Debug.LogError("[PayloadSender] Payload encoder is not assigned.");
             yield break;
         }
 
@@ -64,7 +57,7 @@ public class NetMQPayloadSender : MonoBehaviour
         string normalizedIP = NormalizeServerIP(newServerIP);
         if (!IsValidServerAddress(normalizedIP))
         {
-            Debug.LogWarning($"[NetMQPayloadSender] Invalid server IP/host: '{newServerIP}'");
+            Debug.LogWarning($"[PayloadSender] Invalid server IP/host: '{newServerIP}'");
             return false;
         }
 
@@ -78,7 +71,7 @@ public class NetMQPayloadSender : MonoBehaviour
         string normalizedIP = NormalizeServerIP(newServerIP);
         if (!IsValidServerAddress(normalizedIP))
         {
-            Debug.LogWarning($"[NetMQPayloadSender] Invalid server IP/host: '{newServerIP}'");
+            Debug.LogWarning($"[PayloadSender] Invalid server IP/host: '{newServerIP}'");
             return false;
         }
 
@@ -97,7 +90,7 @@ public class NetMQPayloadSender : MonoBehaviour
         }
 
         NotifyServerIPChanged();
-        Debug.Log($"[NetMQPayloadSender] Server switched to {Endpoint}");
+        Debug.Log($"[PayloadSender] Server switched to {Endpoint}");
         return true;
     }
 
@@ -129,7 +122,7 @@ public class NetMQPayloadSender : MonoBehaviour
         _socket.Options.Linger = TimeSpan.Zero;
         _socket.Connect(Endpoint);
 
-        Debug.Log($"[NetMQPayloadSender] Connected to {Endpoint}");
+        Debug.Log($"[PayloadSender] Connected to {Endpoint}");
     }
 
     private void Reconnect()
@@ -192,13 +185,13 @@ public class NetMQPayloadSender : MonoBehaviour
 
         while (true)
         {
-            if (payloadProvider == null)
+            if (payloadEncoder == null)
             {
                 yield return null;
                 continue;
             }
 
-            if (payloadProvider.TryGetPayload(out byte[][] payloadParts) &&
+            if (payloadEncoder.TryEncodePayload(out byte[][] payloadParts) &&
                 payloadParts != null && payloadParts.Length > 0 && _socket != null)
             {
                 bool sent = _socket.TrySendMultipartBytes(TimeSpan.Zero, payloadParts);
@@ -214,7 +207,7 @@ public class NetMQPayloadSender : MonoBehaviour
                 int total = _sentFrameCount + _droppedFrameCount;
                 if (logInterval > 0 && total > 0 && total % logInterval == 0)
                 {
-                    Debug.Log($"[NetMQPayloadSender] Sent={_sentFrameCount}, Dropped={_droppedFrameCount}");
+                    Debug.Log($"[PayloadSender] Sent={_sentFrameCount}, Dropped={_droppedFrameCount}");
                 }
             }
 
@@ -234,7 +227,6 @@ public class NetMQPayloadSender : MonoBehaviour
         {
             DisconnectSocket();
         }
-
     }
 
     private void OnDestroy()

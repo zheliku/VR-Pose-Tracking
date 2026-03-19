@@ -7,17 +7,22 @@ public class CubeFollow : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        
+
     }
 
     // Update is called once per frame
     void Update()
     {
-        
+
     }
 
     public void FollowTarget(PoseData pose)
     {
+        if (!pose.HasPose)
+        {
+            return;
+        }
+
         var poseMatrix = pose.PoseMatrix.Value;
         var position = new Vector3(poseMatrix.m03, poseMatrix.m13, poseMatrix.m23);
         var rotation = Quaternion.LookRotation(

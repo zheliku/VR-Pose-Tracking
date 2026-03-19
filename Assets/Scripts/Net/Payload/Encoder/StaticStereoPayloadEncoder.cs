@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class StaticStereoTextureProvider : NetMQPayloadProviderBase
+public class StaticStereoPayloadEncoder : PayloadEncoderBase
 {
     [SerializeField] private Texture leftTexture;
     [SerializeField] private Texture rightTexture;
@@ -12,7 +12,7 @@ public class StaticStereoTextureProvider : NetMQPayloadProviderBase
     private byte[] _cachedLeftJpeg;
     private byte[] _cachedRightJpeg;
 
-    public override bool TryGetPayload(out byte[][] payloadParts)
+    public override bool TryEncodePayload(out byte[][] payloadParts)
     {
         payloadParts = null;
 

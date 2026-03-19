@@ -17,14 +17,14 @@ public struct TrackingPayload
     }
 }
 
-public interface ITrackingPayloadParser
+public interface ITrackingPayloadDecoder
 {
-    bool TryParse(byte[][] payloadParts, double timestampMs, out TrackingPayload payload);
+    bool TryDecode(byte[][] payloadParts, double timestampMs, out TrackingPayload payload);
 }
 
-public class TrackingPayloadParser : ITrackingPayloadParser
+public class TrackingPayloadDecoder : ITrackingPayloadDecoder
 {
-    public bool TryParse(byte[][] payloadParts, double timestampMs, out TrackingPayload payload)
+    public bool TryDecode(byte[][] payloadParts, double timestampMs, out TrackingPayload payload)
     {
         payload = default;
 
@@ -109,7 +109,7 @@ public class TrackingPayloadParser : ITrackingPayloadParser
         }
         catch (Exception e)
         {
-            Debug.LogWarning($"[TrackingPayloadParser] Failed to parse pose matrix: {e.Message}");
+            Debug.LogWarning($"[TrackingPayloadDecoder] Failed to parse pose matrix: {e.Message}");
             return null;
         }
     }

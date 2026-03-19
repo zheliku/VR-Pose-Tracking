@@ -1553,7 +1553,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 882331660}
-        m_TargetAssemblyTypeName: QuestStereoSender, Assembly-CSharp
+        m_TargetAssemblyTypeName: PayloadSender, Assembly-CSharp
         m_MethodName: ApplySavedServerIP
         m_Mode: 1
         m_Arguments:
@@ -2043,7 +2043,7 @@ GameObject:
   - component: {fileID: 882331661}
   - component: {fileID: 882331660}
   m_Layer: 0
-  m_Name: NetMQPayloadSender
+  m_Name: PayloadSender
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2060,7 +2060,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1eaa9864e20d99642859bcb2693a69ab, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::QuestStereoSender
+  m_EditorClassIdentifier: Assembly-CSharp::PayloadSender
   payloadProvider: {fileID: 1046697704}
   serverIP: 127.0.0.1
   serverPort: 5557
@@ -2595,7 +2595,7 @@ GameObject:
   - component: {fileID: 1046697705}
   - component: {fileID: 1046697704}
   m_Layer: 0
-  m_Name: StaticStereoTextureProvider
+  m_Name: StaticStereoPayloadEncoder
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2612,7 +2612,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a9e85cc690b3b254c8c4695a5ef9e997, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StaticStereoTextureProvider
+  m_EditorClassIdentifier: Assembly-CSharp::StaticStereoPayloadEncoder
   leftTexture: {fileID: 2800000, guid: dffef66376be4fa480fb02b19edbe903, type: 3}
   rightTexture: {fileID: 2800000, guid: 85698edae8cee474cb380dd0347653c0, type: 3}
   jpegQuality: 80
@@ -3398,7 +3398,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 882331660}
-        m_TargetAssemblyTypeName: QuestStereoSender, Assembly-CSharp
+        m_TargetAssemblyTypeName: PayloadSender, Assembly-CSharp
         m_MethodName: SaveServerIPPreference
         m_Mode: 0
         m_Arguments:
