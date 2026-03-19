@@ -1,21 +1,17 @@
 /*
  * 位姿追踪数据接收器
- * 
- * 从服务器接收位姿追踪数据，通过 UnityEvent 提供数据。
- * 
- * 使用方法：
- * 1. 将此脚本挂载到任意 GameObject
- * 2. 在 Inspector 中配置服务器地址
- * 3. 绑定事件处理函数
+ *
+ * 负责网络接收与事件分发，具体 payload 协议解析由 ITrackingPayloadParser 实现。
+ * 当前默认解析器：TrackingPayloadParser（phase + color + pose_json）。
  */
 
 using System;
 using System.Diagnostics;
 using System.Threading;
-using UnityEngine;
-using UnityEngine.Events;
 using NetMQ;
 using NetMQ.Sockets;
+using UnityEngine;
+using UnityEngine.Events;
 using Debug = UnityEngine.Debug;
 
 /// <summary>
@@ -32,8 +28,10 @@ public enum TrackingPhase
 /// </summary>
 public class PoseDataReceiver : MonoBehaviour
 {
+    private const string ServerIPPrefKey = "PoseDataReceiver.ServerIP";
+
     [Header("Network Settings")]
-    [SerializeField] private string serverIP = "172.24.244.81";
+    [SerializeField] private string serverIP = "127.0.0.1";
     [SerializeField] private int serverPort = 5556;
     [SerializeField] private string topic = "tracking";
 
@@ -54,22 +52,24 @@ public class PoseDataReceiver : MonoBehaviour
     private Thread _receiveThread;
     private volatile bool _running;
 
-    // 线程安全的数据传递
+    private readonly object _lock = new object();
+    private readonly ITrackingPayloadParser _payloadParser = new TrackingPayloadParser();
+    private readonly Stopwatch _stopwatch = new Stopwatch();
+
     private RawData _latestImageData;
     private PoseData _latestPoseData;
     private TrackingPhase _latestPhase;
-    private readonly object _lock = new object();
     private bool _hasNewData;
-
     private TrackingPhase _lastPhase = TrackingPhase.Detecting;
-    private Stopwatch _stopwatch = new Stopwatch();
 
-    // 公共属性
     public bool IsConnected => _running && _socket != null;
     public string ServerAddress => $"tcp://{serverIP}:{serverPort}";
     public TrackingPhase CurrentPhase => _lastPhase;
+    public string CurrentServerIP => serverIP;
 
-    void Awake()
+    public event Action<string> ServerIPChanged;
+
+    private void Awake()
     {
         if (OnImageReceived == null)
             OnImageReceived = new RawDataEvent();
@@ -79,29 +79,103 @@ public class PoseDataReceiver : MonoBehaviour
             OnTrackingStarted = new UnityEvent();
         if (OnTrackingLost == null)
             OnTrackingLost = new UnityEvent();
+
+        LoadServerIPFromPrefs();
+        NotifyServerIPChanged();
     }
 
-    void Start()
+    private void Start()
     {
-        _stopwatch.Start();
+        if (!_stopwatch.IsRunning)
+        {
+            _stopwatch.Start();
+        }
+
         Connect();
+    }
+
+    public bool SaveServerIPPreference(string newServerIP)
+    {
+        string normalizedIP = NormalizeServerIP(newServerIP);
+        if (!IsValidServerAddress(normalizedIP))
+        {
+            Debug.LogWarning($"[PoseDataReceiver] Invalid server IP/host: '{newServerIP}'");
+            return false;
+        }
+
+        PlayerPrefs.SetString(ServerIPPrefKey, normalizedIP);
+        PlayerPrefs.Save();
+        return true;
+    }
+
+    public bool TrySetServerIP(string newServerIP)
+    {
+        string normalizedIP = NormalizeServerIP(newServerIP);
+        if (!IsValidServerAddress(normalizedIP))
+        {
+            Debug.LogWarning($"[PoseDataReceiver] Invalid server IP/host: '{newServerIP}'");
+            return false;
+        }
+
+        if (string.Equals(serverIP, normalizedIP, StringComparison.OrdinalIgnoreCase))
+        {
+            NotifyServerIPChanged();
+            return true;
+        }
+
+        bool wasRunning = _running;
+        if (wasRunning)
+        {
+            Disconnect();
+        }
+
+        serverIP = normalizedIP;
+        SaveServerIPToPrefs();
+
+        if (wasRunning)
+        {
+            Connect();
+        }
+
+        NotifyServerIPChanged();
+        Debug.Log($"[PoseDataReceiver] Server switched to {ServerAddress}");
+        return true;
+    }
+
+    public string GetSavedServerIP()
+    {
+        return NormalizeServerIP(PlayerPrefs.GetString(ServerIPPrefKey, string.Empty));
+    }
+
+    public void ApplySavedServerIP()
+    {
+        string savedServerIP = GetSavedServerIP();
+        if (!string.IsNullOrEmpty(savedServerIP))
+        {
+            TrySetServerIP(savedServerIP);
+        }
     }
 
     public void Connect()
     {
-        if (_running) return;
+        if (_running)
+        {
+            return;
+        }
 
         AsyncIO.ForceDotNet.Force();
 
         _socket = new SubscriberSocket();
+        _socket.Options.ReceiveHighWatermark = 1;
+        _socket.Options.Linger = TimeSpan.Zero;
         _socket.Connect(ServerAddress);
         _socket.Subscribe(topic);
 
-        Debug.Log($"[PoseDataReceiver] Connected to {ServerAddress}, topic: {topic}");
-
         _running = true;
-        _receiveThread = new Thread(ReceiveLoop);
+        _receiveThread = new Thread(ReceiveLoop) { IsBackground = true };
         _receiveThread.Start();
+
+        Debug.Log($"[PoseDataReceiver] Connected to {ServerAddress}, topic: {topic}");
     }
 
     public void Disconnect()
@@ -112,38 +186,34 @@ public class PoseDataReceiver : MonoBehaviour
         {
             _receiveThread.Join(1000);
         }
+        _receiveThread = null;
 
-        if (_socket != null)
-        {
-            _socket.Close();
-            _socket.Dispose();
-            _socket = null;
-        }
-
+        DisconnectSocket();
         Debug.Log("[PoseDataReceiver] Disconnected");
     }
 
-    void Update()
+    private void Update()
     {
         lock (_lock)
         {
-            if (_hasNewData)
+            if (!_hasNewData)
             {
-                // 检测阶段转换
-                if (_lastPhase == TrackingPhase.Detecting && _latestPhase == TrackingPhase.Tracking)
-                {
-                    OnTrackingStarted?.Invoke();
-                }
-                else if (_lastPhase == TrackingPhase.Tracking && _latestPhase == TrackingPhase.Detecting)
-                {
-                    OnTrackingLost?.Invoke();
-                }
-                _lastPhase = _latestPhase;
-
-                OnImageReceived?.Invoke(_latestImageData);
-                OnPoseReceived?.Invoke(_latestPoseData);
-                _hasNewData = false;
+                return;
             }
+
+            if (_lastPhase == TrackingPhase.Detecting && _latestPhase == TrackingPhase.Tracking)
+            {
+                OnTrackingStarted?.Invoke();
+            }
+            else if (_lastPhase == TrackingPhase.Tracking && _latestPhase == TrackingPhase.Detecting)
+            {
+                OnTrackingLost?.Invoke();
+            }
+            _lastPhase = _latestPhase;
+
+            OnImageReceived?.Invoke(_latestImageData);
+            OnPoseReceived?.Invoke(_latestPoseData);
+            _hasNewData = false;
         }
     }
 
@@ -153,35 +223,41 @@ public class PoseDataReceiver : MonoBehaviour
         {
             try
             {
-                if (_socket.TryReceiveFrameBytes(TimeSpan.FromMilliseconds(100), out byte[] topicBytes))
+                if (_socket == null)
                 {
-                    byte[] phaseData = _socket.ReceiveFrameBytes();
-                    byte[] colorData = _socket.ReceiveFrameBytes();
-                    byte[] poseData = _socket.ReceiveFrameBytes();
+                    Thread.Sleep(10);
+                    continue;
+                }
 
-                    TrackingPhase phase = phaseData.Length > 0 && phaseData[0] == 1
-                        ? TrackingPhase.Tracking
-                        : TrackingPhase.Detecting;
+                NetMQMessage message = new NetMQMessage();
+                if (!_socket.TryReceiveMultipartMessage(TimeSpan.FromMilliseconds(100), ref message))
+                {
+                    continue;
+                }
 
-                    Matrix4x4? poseMatrix = null;
-                    if (poseData.Length > 0)
-                    {
-                        string poseJson = System.Text.Encoding.UTF8.GetString(poseData);
-                        if (!string.IsNullOrEmpty(poseJson))
-                        {
-                            poseMatrix = ParsePoseMatrix(poseJson);
-                        }
-                    }
+                if (message.FrameCount < 2)
+                {
+                    continue;
+                }
 
-                    double timestampMs = _stopwatch.Elapsed.TotalMilliseconds;
+                byte[][] payloadParts = new byte[message.FrameCount - 1][];
+                for (int i = 1; i < message.FrameCount; i++)
+                {
+                    payloadParts[i - 1] = message[i].ToByteArray();
+                }
 
-                    lock (_lock)
-                    {
-                        _latestImageData = new RawData(colorData, timestampMs);
-                        _latestPoseData = new PoseData(poseMatrix);
-                        _latestPhase = phase;
-                        _hasNewData = true;
-                    }
+                double timestampMs = _stopwatch.Elapsed.TotalMilliseconds;
+                if (!_payloadParser.TryParse(payloadParts, timestampMs, out TrackingPayload parsedPayload))
+                {
+                    continue;
+                }
+
+                lock (_lock)
+                {
+                    _latestImageData = parsedPayload.ImageData;
+                    _latestPoseData = parsedPayload.PoseData;
+                    _latestPhase = parsedPayload.Phase;
+                    _hasNewData = true;
                 }
             }
             catch (Exception e)
@@ -194,59 +270,66 @@ public class PoseDataReceiver : MonoBehaviour
         }
     }
 
-    private Matrix4x4? ParsePoseMatrix(string json)
+    private void DisconnectSocket()
     {
-        try
+        if (_socket == null)
         {
-            int matrixStart = json.IndexOf("[[");
-            int matrixEnd = json.LastIndexOf("]]");
-            if (matrixStart == -1 || matrixEnd == -1)
-                return null;
-
-            string matrixStr = json.Substring(matrixStart + 1, matrixEnd - matrixStart);
-            Matrix4x4 m = new Matrix4x4();
-            string[] rows = matrixStr.Split(new string[] { "], [", "],[" }, StringSplitOptions.None);
-
-            if (rows.Length != 4)
-                return null;
-
-            for (int row = 0; row < 4; row++)
-            {
-                string rowStr = rows[row].Trim('[', ']', ' ');
-                string[] values = rowStr.Split(',');
-
-                if (values.Length != 4)
-                    return null;
-
-                for (int col = 0; col < 4; col++)
-                {
-                    if (float.TryParse(values[col].Trim(), out float val))
-                    {
-                        m[row, col] = val;
-                    }
-                    else
-                    {
-                        return null;
-                    }
-                }
-            }
-            return m;
+            return;
         }
-        catch (Exception e)
-        {
-            Debug.LogWarning($"[PoseDataReceiver] Failed to parse pose matrix: {e.Message}");
-        }
-        return null;
+
+        _socket.Close();
+        _socket.Dispose();
+        _socket = null;
     }
 
-    void OnDestroy()
+    private void LoadServerIPFromPrefs()
     {
-        Disconnect();
-        NetMQConfig.Cleanup();
+        string savedIP = NormalizeServerIP(PlayerPrefs.GetString(ServerIPPrefKey, string.Empty));
+        if (IsValidServerAddress(savedIP))
+        {
+            serverIP = savedIP;
+        }
     }
 
-    void OnApplicationQuit()
+    private void SaveServerIPToPrefs()
+    {
+        PlayerPrefs.SetString(ServerIPPrefKey, serverIP);
+        PlayerPrefs.Save();
+    }
+
+    private void NotifyServerIPChanged()
+    {
+        ServerIPChanged?.Invoke(serverIP);
+    }
+
+    private static bool IsValidServerAddress(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return Uri.CheckHostName(value) != UriHostNameType.Unknown;
+    }
+
+    private static string NormalizeServerIP(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+    }
+
+    private void Cleanup()
     {
         Disconnect();
+    }
+
+    private void OnDestroy()
+    {
+        Cleanup();
+        NetMQConfig.Cleanup(false);
+    }
+
+    private void OnApplicationQuit()
+    {
+        Cleanup();
     }
 }
