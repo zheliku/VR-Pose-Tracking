@@ -1,19 +1,19 @@
 # ninja log v5
-16	1245	7957890613625289	GameActivity/CMakeFiles/game.dir/UGAEntry.cpp.o	1c054a6378ae8554
-1610	1750	7957890618672372	P:/Unity Project/Work/VR Pose Tracking/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/5u3t4y3t/obj/arm64-v8a/libgame.so	9559d4b886a625d3
-26	1242	7957890613583357	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	5063656fb9c76967
-23	1261	7957890613795898	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	966f7b111372d2e4
-9	1309	7957890614269234	GameActivity/CMakeFiles/game.dir/UGADebug.cpp.o	2ef2597d294bd1b9
-13	1257	7957890613745634	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	4479768e6a584499
-31	1609	7957890617256039	GameActivity/CMakeFiles/game.dir/UGASoftKeyboard.cpp.o	155c3c78051bc8ce
-19	1435	7957890615517648	GameActivity/CMakeFiles/game.dir/UGAInput.cpp.o	a730496eddc79ddb
-5	1507	7957890616233324	GameActivity/CMakeFiles/game.dir/UGAApplication.cpp.o	4a584ee17c36c0e0
-31	634	7957913747953136	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	5063656fb9c76967
+899	960	7957913751230234	P:/Unity Project/Work/VR Pose Tracking/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/5u3t4y3t/obj/arm64-v8a/libgame.so	9559d4b886a625d3
 15	641	7957913748030507	GameActivity/CMakeFiles/game.dir/UGAEntry.cpp.o	1c054a6378ae8554
-18	645	7957913748067903	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	4479768e6a584499
-25	652	7957913748129227	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	966f7b111372d2e4
+31	634	7957913747953136	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	5063656fb9c76967
 21	701	7957913748620866	GameActivity/CMakeFiles/game.dir/UGADebug.cpp.o	2ef2597d294bd1b9
+25	652	7957913748129227	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	966f7b111372d2e4
 36	735	7957913748968623	GameActivity/CMakeFiles/game.dir/UGASoftKeyboard.cpp.o	155c3c78051bc8ce
+18	645	7957913748067903	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	4479768e6a584499
 28	819	7957913749792981	GameActivity/CMakeFiles/game.dir/UGAInput.cpp.o	a730496eddc79ddb
 4	899	7957913750582207	GameActivity/CMakeFiles/game.dir/UGAApplication.cpp.o	4a584ee17c36c0e0
-899	960	7957913751230234	P:/Unity Project/Work/VR Pose Tracking/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/5u3t4y3t/obj/arm64-v8a/libgame.so	9559d4b886a625d3
+45	1104	7958050801293087	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	5063656fb9c76967
+16	1106	7958050801308497	GameActivity/CMakeFiles/game.dir/UGAEntry.cpp.o	1c054a6378ae8554
+20	1109	7958050801338841	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	4479768e6a584499
+36	1119	7958050801436135	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	966f7b111372d2e4
+31	1127	7958050801519717	GameActivity/CMakeFiles/game.dir/UGADebug.cpp.o	2ef2597d294bd1b9
+53	1190	7958050802158757	GameActivity/CMakeFiles/game.dir/UGASoftKeyboard.cpp.o	155c3c78051bc8ce
+40	1272	7958050802979688	GameActivity/CMakeFiles/game.dir/UGAInput.cpp.o	a730496eddc79ddb
+7	1372	7958050803943012	GameActivity/CMakeFiles/game.dir/UGAApplication.cpp.o	4a584ee17c36c0e0
+1372	1497	7958050805209711	P:/Unity Project/Work/VR Pose Tracking/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/5u3t4y3t/obj/arm64-v8a/libgame.so	9559d4b886a625d3
