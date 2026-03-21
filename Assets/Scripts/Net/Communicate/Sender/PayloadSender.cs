@@ -14,8 +14,6 @@ using UnityEngine;
 /// </summary>
 public class PayloadSender : MonoBehaviour
 {
-    private const string ServerIPPrefKey = "PayloadSender.ServerIP";
-
     [Header("Data Encoder")]
     [SerializeField] private EncoderBase payloadEncoder;
 
@@ -26,22 +24,36 @@ public class PayloadSender : MonoBehaviour
     [Header("Send Settings")]
     [Range(1, 90)]
     [SerializeField] private int targetFps = 60;
+    [Range(1, 90)]
     [SerializeField] private int logInterval = 30;
+    [Range(1, 100)]
+    [SerializeField] private int sendHighWatermark = 1;
+    [SerializeField] private int socketLingerMs = 0;
 
     private PushSocket _socket;
     private Coroutine _sendCoroutine;
 
     private int _sentFrameCount;
     private int _droppedFrameCount;
+    private int _lastStatTotal;
+    private int _lastStatSent;
+    private double _lastStatTime;
+    private double _encodeTimeAcc;
+    private double _sendTimeAcc;
 
     private string Endpoint => $"tcp://{serverIP}:{serverPort}";
     public string CurrentServerIP => serverIP;
+    public int CurrentServerPort => serverPort;
+    public int CurrentTargetFps => targetFps;
+    public int CurrentLogInterval => logInterval;
+    public int CurrentSendHighWatermark => sendHighWatermark;
+    public int CurrentSocketLingerMs => socketLingerMs;
 
     [Header("Events")]
     public StringEvent OnServerIPChanged = new StringEvent();
 
     /// <summary>
-    /// 初始化事件、恢复保存的 IP、自动查找同对象编码器。
+    /// 初始化事件并自动查找同对象编码器。
     /// </summary>
     private void Awake()
     {
@@ -50,7 +62,6 @@ public class PayloadSender : MonoBehaviour
             OnServerIPChanged = new StringEvent();
         }
 
-        LoadServerIPFromPrefs();
         if (payloadEncoder == null)
         {
             payloadEncoder = GetComponent<EncoderBase>();
@@ -71,13 +82,14 @@ public class PayloadSender : MonoBehaviour
         }
 
         Connect();
+        _lastStatTime = Time.realtimeSinceStartupAsDouble;
         _sendCoroutine = StartCoroutine(SendLoop());
     }
 
     /// <summary>
-    /// 保存 IP 到 PlayerPrefs，不影响当前连接状态。
+    /// 一次性设置发送端连接配置（单次重连）。
     /// </summary>
-    public bool SaveServerIPPreference(string newServerIP)
+    public bool TryApplyServerConfig(string newServerIP, int newServerPort)
     {
         string normalizedIP = NormalizeServerIP(newServerIP);
         if (!IsValidServerAddress(normalizedIP))
@@ -86,31 +98,23 @@ public class PayloadSender : MonoBehaviour
             return false;
         }
 
-        PlayerPrefs.SetString(ServerIPPrefKey, normalizedIP);
-        PlayerPrefs.Save();
-        return true;
-    }
-
-    /// <summary>
-    /// 运行中切换服务器地址，必要时自动重连。
-    /// </summary>
-    public bool TrySetServerIP(string newServerIP)
-    {
-        string normalizedIP = NormalizeServerIP(newServerIP);
-        if (!IsValidServerAddress(normalizedIP))
+        if (!IsValidPort(newServerPort))
         {
-            Debug.LogWarning($"[PayloadSender] Invalid server IP/host: '{newServerIP}'");
+            Debug.LogWarning($"[PayloadSender] Invalid server port: '{newServerPort}'");
             return false;
         }
 
-        if (string.Equals(serverIP, normalizedIP, StringComparison.OrdinalIgnoreCase))
+        bool unchanged =
+            string.Equals(serverIP, normalizedIP, StringComparison.OrdinalIgnoreCase) &&
+            serverPort == newServerPort;
+        if (unchanged)
         {
             NotifyServerIPChanged();
             return true;
         }
 
         serverIP = normalizedIP;
-        SaveServerIPToPrefs();
+        serverPort = newServerPort;
 
         if (_socket != null)
         {
@@ -123,23 +127,58 @@ public class PayloadSender : MonoBehaviour
     }
 
     /// <summary>
-    /// 仅读取已保存 IP，不直接应用。
+    /// 一次性设置发送策略参数。
     /// </summary>
-    public string GetSavedServerIP()
+    public bool TryApplySendSettings(int newTargetFps, int newLogInterval, int newSendHighWatermark, int newSocketLingerMs)
     {
-        return NormalizeServerIP(PlayerPrefs.GetString(ServerIPPrefKey, string.Empty));
-    }
-
-    /// <summary>
-    /// 应用本地保存 IP 到当前连接。
-    /// </summary>
-    public void ApplySavedServerIP()
-    {
-        string savedServerIP = GetSavedServerIP();
-        if (!string.IsNullOrEmpty(savedServerIP))
+        if (!IsValidTargetFps(newTargetFps))
         {
-            TrySetServerIP(savedServerIP);
+            Debug.LogWarning($"[PayloadSender] Invalid targetFps: '{newTargetFps}'");
+            return false;
         }
+
+        if (!IsValidLogInterval(newLogInterval))
+        {
+            Debug.LogWarning($"[PayloadSender] Invalid logInterval: '{newLogInterval}'");
+            return false;
+        }
+
+        if (!IsValidHighWatermark(newSendHighWatermark))
+        {
+            Debug.LogWarning($"[PayloadSender] Invalid sendHighWatermark: '{newSendHighWatermark}'");
+            return false;
+        }
+
+        if (!IsValidLingerMs(newSocketLingerMs))
+        {
+            Debug.LogWarning($"[PayloadSender] Invalid socketLingerMs: '{newSocketLingerMs}'");
+            return false;
+        }
+
+        bool socketOptionChanged =
+            sendHighWatermark != newSendHighWatermark ||
+            socketLingerMs != newSocketLingerMs;
+
+        bool unchanged =
+            targetFps == newTargetFps &&
+            logInterval == newLogInterval &&
+            !socketOptionChanged;
+        if (unchanged)
+        {
+            return true;
+        }
+
+        targetFps = newTargetFps;
+        logInterval = newLogInterval;
+        sendHighWatermark = newSendHighWatermark;
+        socketLingerMs = newSocketLingerMs;
+
+        if (_socket != null && socketOptionChanged)
+        {
+            Reconnect();
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -156,8 +195,8 @@ public class PayloadSender : MonoBehaviour
         AsyncIO.ForceDotNet.Force();
 
         _socket = new PushSocket();
-        _socket.Options.SendHighWatermark = 1;
-        _socket.Options.Linger = TimeSpan.Zero;
+        _socket.Options.SendHighWatermark = sendHighWatermark;
+        _socket.Options.Linger = TimeSpan.FromMilliseconds(socketLingerMs);
         _socket.Connect(Endpoint);
 
         Debug.Log($"[PayloadSender] Connected to {Endpoint}");
@@ -185,27 +224,6 @@ public class PayloadSender : MonoBehaviour
         _socket.Close();
         _socket.Dispose();
         _socket = null;
-    }
-
-    /// <summary>
-    /// 从本地配置加载 IP。
-    /// </summary>
-    private void LoadServerIPFromPrefs()
-    {
-        string savedIP = NormalizeServerIP(PlayerPrefs.GetString(ServerIPPrefKey, string.Empty));
-        if (IsValidServerAddress(savedIP))
-        {
-            serverIP = savedIP;
-        }
-    }
-
-    /// <summary>
-    /// 持久化当前 IP。
-    /// </summary>
-    private void SaveServerIPToPrefs()
-    {
-        PlayerPrefs.SetString(ServerIPPrefKey, serverIP);
-        PlayerPrefs.Save();
     }
 
     /// <summary>
@@ -238,6 +256,14 @@ public class PayloadSender : MonoBehaviour
     }
 
     /// <summary>
+    /// 校验端口范围。
+    /// </summary>
+    private static bool IsValidPort(int value)
+    {
+        return value is >= 1 and <= 65535;
+    }
+
+    /// <summary>
     /// 固定帧率发送循环。
     ///
     /// 流程：
@@ -250,21 +276,27 @@ public class PayloadSender : MonoBehaviour
     /// </summary>
     private IEnumerator SendLoop()
     {
-        float intervalSeconds = 1f / Mathf.Max(1, targetFps);
-        WaitForSeconds wait = new WaitForSeconds(intervalSeconds);
-
         while (true)
         {
+            double frameStart = Time.realtimeSinceStartupAsDouble;
+
             if (payloadEncoder == null)
             {
                 yield return null;
                 continue;
             }
 
-            if (payloadEncoder.TryEncodePayload(out byte[][] payloadParts) &&
-                payloadParts != null && payloadParts.Length > 0 && _socket != null)
+            double encodeStart = Time.realtimeSinceStartupAsDouble;
+            bool encoded = payloadEncoder.TryEncodePayload(out byte[][] payloadParts) &&
+                           payloadParts != null && payloadParts.Length > 0;
+            _encodeTimeAcc += Time.realtimeSinceStartupAsDouble - encodeStart;
+
+            if (encoded && _socket != null)
             {
+                double sendStart = Time.realtimeSinceStartupAsDouble;
                 bool sent = _socket.TrySendMultipartBytes(TimeSpan.Zero, payloadParts);
+                _sendTimeAcc += Time.realtimeSinceStartupAsDouble - sendStart;
+
                 if (sent)
                 {
                     _sentFrameCount++;
@@ -277,12 +309,59 @@ public class PayloadSender : MonoBehaviour
                 int total = _sentFrameCount + _droppedFrameCount;
                 if (logInterval > 0 && total > 0 && total % logInterval == 0)
                 {
-                    Debug.Log($"[PayloadSender] Sent={_sentFrameCount}, Dropped={_droppedFrameCount}");
+                    double now = Time.realtimeSinceStartupAsDouble;
+                    double intervalSec = now - _lastStatTime;
+                    int deltaTotal = total - _lastStatTotal;
+                    int deltaSent = _sentFrameCount - _lastStatSent;
+
+                    float actualFps = intervalSec > 0d ? (float)(deltaSent / intervalSec) : 0f;
+                    float dropRate = deltaTotal > 0 ? (float)(deltaTotal - deltaSent) / deltaTotal : 0f;
+                    float avgEncodeMs = deltaTotal > 0 ? (float)(_encodeTimeAcc / deltaTotal * 1000d) : 0f;
+                    float avgSendMs = deltaTotal > 0 ? (float)(_sendTimeAcc / deltaTotal * 1000d) : 0f;
+
+                    Debug.Log($"[PayloadSender] Sent={_sentFrameCount}, Dropped={_droppedFrameCount}, ActualFPS={actualFps:F1}, DropRate={dropRate:P1}, Encode={avgEncodeMs:F2}ms, NetSend={avgSendMs:F3}ms, Interval={intervalSec:F2}s");
+
+                    _lastStatTime = now;
+                    _lastStatTotal = total;
+                    _lastStatSent = _sentFrameCount;
+                    _encodeTimeAcc = 0d;
+                    _sendTimeAcc = 0d;
                 }
             }
 
-            yield return wait;
+            float targetIntervalSeconds = 1f / Mathf.Max(1, targetFps);
+            float elapsedSeconds = (float)(Time.realtimeSinceStartupAsDouble - frameStart);
+            float remainingSeconds = targetIntervalSeconds - elapsedSeconds;
+
+            if (remainingSeconds > 0f)
+            {
+                yield return new WaitForSecondsRealtime(remainingSeconds);
+            }
+            else
+            {
+                yield return null;
+            }
         }
+    }
+
+    private static bool IsValidTargetFps(int value)
+    {
+        return value is >= 1 and <= 90;
+    }
+
+    private static bool IsValidLogInterval(int value)
+    {
+        return value >= 0;
+    }
+
+    private static bool IsValidHighWatermark(int value)
+    {
+        return value >= 1;
+    }
+
+    private static bool IsValidLingerMs(int value)
+    {
+        return value >= 0;
     }
 
     /// <summary>

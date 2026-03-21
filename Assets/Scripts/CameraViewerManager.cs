@@ -50,11 +50,6 @@ public class CameraViewerManager : MonoBehaviour
             return false;
         }
 
-        if (_leftCameraAccess && _rightCameraAccess)
-        {
-            return true;
-        }
-
         _leftCameraTexture = _leftCameraAccess.GetTexture();
         _rightCameraTexture = _rightCameraAccess.GetTexture();
 
@@ -78,6 +73,6 @@ public class CameraViewerManager : MonoBehaviour
             Debug.LogWarning($"[{nameof(CameraViewerManager)}] Right Passthrough texture not available yet.");
         }
 
-        return _leftCameraTexture && _rightCameraTexture;
+        return _leftCameraTexture != null && _rightCameraTexture != null;
     }
 }

@@ -49,13 +49,14 @@ public class RawPayloadEvent : UnityEvent<RawPayload> { }
 /// </summary>
 public class PayloadReceiver : MonoBehaviour
 {
-    private const string ServerIPPrefKey = "PayloadReceiver.ServerIP";
-
     [Header("Network Settings")]
     [SerializeField] private string serverIP = "127.0.0.1";
     [SerializeField] private int serverPort = 5556;
     [SerializeField] private bool useTopic = true;
     [SerializeField] private string topic = "payload";
+    [SerializeField] private int receiveHighWatermark = 1;
+    [SerializeField] private int socketLingerMs = 0;
+    [SerializeField] private int receivePollTimeoutMs = 100;
 
     private SubscriberSocket _socket;
     private Thread _receiveThread;
@@ -69,15 +70,19 @@ public class PayloadReceiver : MonoBehaviour
     public bool IsConnected => _running && _socket != null;
     public string ServerAddress => $"tcp://{serverIP}:{serverPort}";
     public string CurrentServerIP => serverIP;
+    public int CurrentServerPort => serverPort;
     public bool UseTopic => useTopic;
     public string Topic => topic;
+    public int CurrentReceiveHighWatermark => receiveHighWatermark;
+    public int CurrentSocketLingerMs => socketLingerMs;
+    public int CurrentReceivePollTimeoutMs => receivePollTimeoutMs;
 
     [Header("Events")]
     public StringEvent OnServerIPChanged = new StringEvent();
     public RawPayloadEvent OnPayloadReceived = new RawPayloadEvent();
 
     /// <summary>
-    /// 初始化可序列化事件、topic 默认值与本地持久化 IP。
+    /// 初始化可序列化事件与 topic 默认值。
     /// </summary>
     protected virtual void Awake()
     {
@@ -91,7 +96,6 @@ public class PayloadReceiver : MonoBehaviour
             topic = "payload";
         }
 
-        LoadServerIPFromPrefs();
         NotifyServerIPChanged();
     }
 
@@ -138,10 +142,9 @@ public class PayloadReceiver : MonoBehaviour
     }
 
     /// <summary>
-    /// 仅保存配置，不切换当前连接。
-    /// 用于“输入后先保存，稍后手动应用”的 UI 交互。
+    /// 一次性设置接收端连接配置（单次重连）。
     /// </summary>
-    public bool SaveServerIPPreference(string newServerIP)
+    public bool TryApplyConnectionConfig(string newServerIP, int newServerPort, bool newUseTopic, string newTopic)
     {
         string normalizedIP = NormalizeServerIP(newServerIP);
         if (!IsValidServerAddress(normalizedIP))
@@ -150,24 +153,25 @@ public class PayloadReceiver : MonoBehaviour
             return false;
         }
 
-        PlayerPrefs.SetString(ServerIPPrefKey, normalizedIP);
-        PlayerPrefs.Save();
-        return true;
-    }
-
-    /// <summary>
-    /// 切换当前连接地址：必要时断开重连，并广播 IP 变更事件。
-    /// </summary>
-    public bool TrySetServerIP(string newServerIP)
-    {
-        string normalizedIP = NormalizeServerIP(newServerIP);
-        if (!IsValidServerAddress(normalizedIP))
+        if (!IsValidPort(newServerPort))
         {
-            Debug.LogWarning($"[PayloadReceiver] Invalid server IP/host: '{newServerIP}'");
+            Debug.LogWarning($"[PayloadReceiver] Invalid server port: '{newServerPort}'");
             return false;
         }
 
-        if (string.Equals(serverIP, normalizedIP, StringComparison.OrdinalIgnoreCase))
+        string normalizedTopic = NormalizeTopic(newTopic);
+        if (newUseTopic && string.IsNullOrEmpty(normalizedTopic))
+        {
+            Debug.LogWarning("[PayloadReceiver] Topic cannot be empty when useTopic is enabled.");
+            return false;
+        }
+
+        bool unchanged =
+            string.Equals(serverIP, normalizedIP, StringComparison.OrdinalIgnoreCase) &&
+            serverPort == newServerPort &&
+            useTopic == newUseTopic &&
+            string.Equals(topic, normalizedTopic, StringComparison.Ordinal);
+        if (unchanged)
         {
             NotifyServerIPChanged();
             return true;
@@ -180,7 +184,9 @@ public class PayloadReceiver : MonoBehaviour
         }
 
         serverIP = normalizedIP;
-        SaveServerIPToPrefs();
+        serverPort = newServerPort;
+        useTopic = newUseTopic;
+        topic = normalizedTopic;
 
         if (wasRunning)
         {
@@ -193,23 +199,59 @@ public class PayloadReceiver : MonoBehaviour
     }
 
     /// <summary>
-    /// 读取已保存地址（仅读取，不应用）。
+    /// 一次性设置接收策略参数。
     /// </summary>
-    public string GetSavedServerIP()
+    public bool TryApplyReceiveSettings(int newReceiveHighWatermark, int newSocketLingerMs, int newReceivePollTimeoutMs)
     {
-        return NormalizeServerIP(PlayerPrefs.GetString(ServerIPPrefKey, string.Empty));
-    }
-
-    /// <summary>
-    /// 将已保存地址应用到当前连接。
-    /// </summary>
-    public void ApplySavedServerIP()
-    {
-        string savedServerIP = GetSavedServerIP();
-        if (!string.IsNullOrEmpty(savedServerIP))
+        if (!IsValidHighWatermark(newReceiveHighWatermark))
         {
-            TrySetServerIP(savedServerIP);
+            Debug.LogWarning($"[PayloadReceiver] Invalid receiveHighWatermark: '{newReceiveHighWatermark}'");
+            return false;
         }
+
+        if (!IsValidLingerMs(newSocketLingerMs))
+        {
+            Debug.LogWarning($"[PayloadReceiver] Invalid socketLingerMs: '{newSocketLingerMs}'");
+            return false;
+        }
+
+        if (!IsValidPollTimeoutMs(newReceivePollTimeoutMs))
+        {
+            Debug.LogWarning($"[PayloadReceiver] Invalid receivePollTimeoutMs: '{newReceivePollTimeoutMs}'");
+            return false;
+        }
+
+        bool socketOptionChanged =
+            receiveHighWatermark != newReceiveHighWatermark ||
+            socketLingerMs != newSocketLingerMs;
+
+        bool unchanged =
+            receivePollTimeoutMs == newReceivePollTimeoutMs &&
+            !socketOptionChanged;
+        if (unchanged)
+        {
+            return true;
+        }
+
+        receiveHighWatermark = newReceiveHighWatermark;
+        socketLingerMs = newSocketLingerMs;
+        receivePollTimeoutMs = newReceivePollTimeoutMs;
+
+        if (_socket != null && socketOptionChanged)
+        {
+            bool wasRunning = _running;
+            if (wasRunning)
+            {
+                Disconnect();
+                Connect();
+            }
+            else
+            {
+                DisconnectSocket();
+            }
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -226,8 +268,8 @@ public class PayloadReceiver : MonoBehaviour
         AsyncIO.ForceDotNet.Force();
 
         _socket = new SubscriberSocket();
-        _socket.Options.ReceiveHighWatermark = 1;
-        _socket.Options.Linger = TimeSpan.Zero;
+        _socket.Options.ReceiveHighWatermark = receiveHighWatermark;
+        _socket.Options.Linger = TimeSpan.FromMilliseconds(socketLingerMs);
         _socket.Connect(ServerAddress);
         _socket.Subscribe(useTopic ? topic : string.Empty);
 
@@ -275,7 +317,7 @@ public class PayloadReceiver : MonoBehaviour
                 }
 
                 NetMQMessage message = new NetMQMessage();
-                if (!_socket.TryReceiveMultipartMessage(TimeSpan.FromMilliseconds(100), ref message))
+                if (!_socket.TryReceiveMultipartMessage(TimeSpan.FromMilliseconds(receivePollTimeoutMs), ref message))
                 {
                     continue;
                 }
@@ -333,27 +375,6 @@ public class PayloadReceiver : MonoBehaviour
     }
 
     /// <summary>
-    /// 从 PlayerPrefs 读取并覆盖当前 IP（若合法）。
-    /// </summary>
-    private void LoadServerIPFromPrefs()
-    {
-        string savedIP = NormalizeServerIP(PlayerPrefs.GetString(ServerIPPrefKey, string.Empty));
-        if (IsValidServerAddress(savedIP))
-        {
-            serverIP = savedIP;
-        }
-    }
-
-    /// <summary>
-    /// 将当前 IP 写入 PlayerPrefs。
-    /// </summary>
-    private void SaveServerIPToPrefs()
-    {
-        PlayerPrefs.SetString(ServerIPPrefKey, serverIP);
-        PlayerPrefs.Save();
-    }
-
-    /// <summary>
     /// 广播当前 IP，供 UI 或调试面板同步显示。
     /// </summary>
     private void NotifyServerIPChanged()
@@ -380,6 +401,37 @@ public class PayloadReceiver : MonoBehaviour
     private static string NormalizeServerIP(string value)
     {
         return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+    }
+
+    /// <summary>
+    /// 归一化 topic 输入。
+    /// </summary>
+    private static string NormalizeTopic(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+    }
+
+    /// <summary>
+    /// 校验端口范围。
+    /// </summary>
+    private static bool IsValidPort(int value)
+    {
+        return value is >= 1 and <= 65535;
+    }
+
+    private static bool IsValidHighWatermark(int value)
+    {
+        return value >= 1;
+    }
+
+    private static bool IsValidLingerMs(int value)
+    {
+        return value >= 0;
+    }
+
+    private static bool IsValidPollTimeoutMs(int value)
+    {
+        return value >= 1;
     }
 
     /// <summary>
