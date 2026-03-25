@@ -1796,7 +1796,6 @@ GameObject:
   m_Component:
   - component: {fileID: 882331661}
   - component: {fileID: 882331660}
-  - component: {fileID: 882331662}
   m_Layer: 0
   m_Name: PayloadSender
   m_TagString: Untagged
@@ -1817,15 +1816,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PayloadSender
   payloadEncoder: {fileID: 217519040}
-  serverIP: 127.0.0.1
-  serverPort: 5557
-  targetFps: 60
-  logInterval: 30
-  sendHighWatermark: 1
-  socketLingerMs: 0
-  OnServerIPChanged:
-    m_PersistentCalls:
-      m_Calls: []
 --- !u!4 &882331661
 Transform:
   m_ObjectHideFlags: 0
@@ -1841,25 +1831,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &882331662
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 882331659}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ce32dffbe5ed85a41bb2a124e83ff63e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RuntimeSenderConfigPanel
-  payloadSender: {fileID: 882331660}
-  serverIP: 127.0.0.1
-  serverPort: 5557
-  targetFps: 60
-  logInterval: 30
-  sendHighWatermark: 1
-  socketLingerMs: 0
 --- !u!1 &936837636
 GameObject:
   m_ObjectHideFlags: 0

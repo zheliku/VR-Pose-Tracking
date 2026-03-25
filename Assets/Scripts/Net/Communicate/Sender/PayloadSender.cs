@@ -2,7 +2,9 @@ using System;
 using System.Collections;
 using NetMQ;
 using NetMQ.Sockets;
+using RuntimeInspectorNamespace;
 using UnityEngine;
+using VInspector;
 
 /// <summary>
 /// Unity 侧通用 Payload 发送器。
@@ -14,21 +16,14 @@ using UnityEngine;
 /// </summary>
 public class PayloadSender : MonoBehaviour
 {
-    [Header("Data Encoder")]
+    private const string SenderIPPrefKey = "PayloadSender.ServerIP";
+    private const string SenderPortPrefKey = "PayloadSender.ServerPort";
+    private const string TargetFpsPrefKey = "PayloadSender.TargetFps";
+    private const string LogIntervalPrefKey = "PayloadSender.LogInterval";
+    private const string SendHighWatermarkPrefKey = "PayloadSender.SendHighWatermark";
+    private const string SocketLingerMsPrefKey = "PayloadSender.SocketLingerMs";
+
     [SerializeField] private EncoderBase payloadEncoder;
-
-    [Header("Network")]
-    [SerializeField] private string serverIP = "127.0.0.1";
-    [SerializeField] private int serverPort = 5557;
-
-    [Header("Send Settings")]
-    [Range(1, 90)]
-    [SerializeField] private int targetFps = 60;
-    [Range(1, 90)]
-    [SerializeField] private int logInterval = 30;
-    [Range(1, 100)]
-    [SerializeField] private int sendHighWatermark = 1;
-    [SerializeField] private int socketLingerMs = 0;
 
     private PushSocket _socket;
     private Coroutine _sendCoroutine;
@@ -41,32 +36,59 @@ public class PayloadSender : MonoBehaviour
     private double _encodeTimeAcc;
     private double _sendTimeAcc;
 
-    private string Endpoint => $"tcp://{serverIP}:{serverPort}";
-    public string CurrentServerIP => serverIP;
-    public int CurrentServerPort => serverPort;
-    public int CurrentTargetFps => targetFps;
-    public int CurrentLogInterval => logInterval;
-    public int CurrentSendHighWatermark => sendHighWatermark;
-    public int CurrentSocketLingerMs => socketLingerMs;
+    [ShowInInspector]
+    public string ServerIP
+    {
+        get => PlayerPrefs.GetString(SenderIPPrefKey, "127.0.0.1");
+        set => PlayerPrefs.SetString(SenderIPPrefKey, value);
+    }
 
-    [Header("Events")]
-    public StringEvent OnServerIPChanged = new StringEvent();
+    [ShowInInspector]
+    public int ServerPort
+    {
+        get => PlayerPrefs.GetInt(SenderPortPrefKey, 5557);
+        set => PlayerPrefs.SetInt(SenderPortPrefKey, value);
+    }
+
+    [ShowInInspector]
+    public int TargetFps
+    {
+        get => PlayerPrefs.GetInt(TargetFpsPrefKey, 60);
+        set => PlayerPrefs.SetInt(TargetFpsPrefKey, value);
+    }
+
+    [ShowInInspector]
+    public int LogInterval
+    {
+        get => PlayerPrefs.GetInt(LogIntervalPrefKey, 30);
+        set => PlayerPrefs.SetInt(LogIntervalPrefKey, value);
+    }
+
+    [ShowInInspector]
+    public int SendHighWatermark
+    {
+        get => PlayerPrefs.GetInt(SendHighWatermarkPrefKey, 1);
+        set => PlayerPrefs.SetInt(SendHighWatermarkPrefKey, value);
+    }
+
+    [ShowInInspector]
+    public int SocketLingerMs
+    {
+        get => PlayerPrefs.GetInt(SocketLingerMsPrefKey, 0);
+        set => PlayerPrefs.SetInt(SocketLingerMsPrefKey, value);
+    }
+
+    private string Endpoint => $"tcp://{ServerIP}:{ServerPort}";
 
     /// <summary>
     /// 初始化事件并自动查找同对象编码器。
     /// </summary>
     private void Awake()
     {
-        if (OnServerIPChanged == null)
-        {
-            OnServerIPChanged = new StringEvent();
-        }
-
         if (payloadEncoder == null)
         {
             payloadEncoder = GetComponent<EncoderBase>();
         }
-        NotifyServerIPChanged();
     }
 
     /// <summary>
@@ -87,101 +109,6 @@ public class PayloadSender : MonoBehaviour
     }
 
     /// <summary>
-    /// 一次性设置发送端连接配置（单次重连）。
-    /// </summary>
-    public bool TryApplyServerConfig(string newServerIP, int newServerPort)
-    {
-        string normalizedIP = NormalizeServerIP(newServerIP);
-        if (!IsValidServerAddress(normalizedIP))
-        {
-            Debug.LogWarning($"[PayloadSender] Invalid server IP/host: '{newServerIP}'");
-            return false;
-        }
-
-        if (!IsValidPort(newServerPort))
-        {
-            Debug.LogWarning($"[PayloadSender] Invalid server port: '{newServerPort}'");
-            return false;
-        }
-
-        bool unchanged =
-            string.Equals(serverIP, normalizedIP, StringComparison.OrdinalIgnoreCase) &&
-            serverPort == newServerPort;
-        if (unchanged)
-        {
-            NotifyServerIPChanged();
-            return true;
-        }
-
-        serverIP = normalizedIP;
-        serverPort = newServerPort;
-
-        if (_socket != null)
-        {
-            Reconnect();
-        }
-
-        NotifyServerIPChanged();
-        Debug.Log($"[PayloadSender] Server switched to {Endpoint}");
-        return true;
-    }
-
-    /// <summary>
-    /// 一次性设置发送策略参数。
-    /// </summary>
-    public bool TryApplySendSettings(int newTargetFps, int newLogInterval, int newSendHighWatermark, int newSocketLingerMs)
-    {
-        if (!IsValidTargetFps(newTargetFps))
-        {
-            Debug.LogWarning($"[PayloadSender] Invalid targetFps: '{newTargetFps}'");
-            return false;
-        }
-
-        if (!IsValidLogInterval(newLogInterval))
-        {
-            Debug.LogWarning($"[PayloadSender] Invalid logInterval: '{newLogInterval}'");
-            return false;
-        }
-
-        if (!IsValidHighWatermark(newSendHighWatermark))
-        {
-            Debug.LogWarning($"[PayloadSender] Invalid sendHighWatermark: '{newSendHighWatermark}'");
-            return false;
-        }
-
-        if (!IsValidLingerMs(newSocketLingerMs))
-        {
-            Debug.LogWarning($"[PayloadSender] Invalid socketLingerMs: '{newSocketLingerMs}'");
-            return false;
-        }
-
-        bool socketOptionChanged =
-            sendHighWatermark != newSendHighWatermark ||
-            socketLingerMs != newSocketLingerMs;
-
-        bool unchanged =
-            targetFps == newTargetFps &&
-            logInterval == newLogInterval &&
-            !socketOptionChanged;
-        if (unchanged)
-        {
-            return true;
-        }
-
-        targetFps = newTargetFps;
-        logInterval = newLogInterval;
-        sendHighWatermark = newSendHighWatermark;
-        socketLingerMs = newSocketLingerMs;
-
-        if (_socket != null && socketOptionChanged)
-        {
-            Reconnect();
-        }
-
-        return true;
-    }
-
-    /// <summary>
     /// 建立 PUSH 连接。
     /// HWM=1：仅保留极少积压，降低延迟尾部。
     /// </summary>
@@ -195,8 +122,8 @@ public class PayloadSender : MonoBehaviour
         AsyncIO.ForceDotNet.Force();
 
         _socket = new PushSocket();
-        _socket.Options.SendHighWatermark = sendHighWatermark;
-        _socket.Options.Linger = TimeSpan.FromMilliseconds(socketLingerMs);
+        _socket.Options.SendHighWatermark = SendHighWatermark;
+        _socket.Options.Linger = TimeSpan.FromMilliseconds(SocketLingerMs);
         _socket.Connect(Endpoint);
 
         Debug.Log($"[PayloadSender] Connected to {Endpoint}");
@@ -205,6 +132,8 @@ public class PayloadSender : MonoBehaviour
     /// <summary>
     /// 地址变更时的重连入口。
     /// </summary>
+    [Button("Reconnect")]
+    [RuntimeInspectorButton("Reconnect", false, ButtonVisibility.InitializedObjects)]
     private void Reconnect()
     {
         DisconnectSocket();
@@ -224,43 +153,6 @@ public class PayloadSender : MonoBehaviour
         _socket.Close();
         _socket.Dispose();
         _socket = null;
-    }
-
-    /// <summary>
-    /// 广播 IP 变化事件，供 UI 同步显示。
-    /// </summary>
-    private void NotifyServerIPChanged()
-    {
-        OnServerIPChanged?.Invoke(serverIP);
-    }
-
-    /// <summary>
-    /// 校验 host/IP 的可用性。
-    /// </summary>
-    private static bool IsValidServerAddress(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return false;
-        }
-
-        return Uri.CheckHostName(value) != UriHostNameType.Unknown;
-    }
-
-    /// <summary>
-    /// 归一化输入地址。
-    /// </summary>
-    private static string NormalizeServerIP(string value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
-    }
-
-    /// <summary>
-    /// 校验端口范围。
-    /// </summary>
-    private static bool IsValidPort(int value)
-    {
-        return value is >= 1 and <= 65535;
     }
 
     /// <summary>
@@ -307,6 +199,7 @@ public class PayloadSender : MonoBehaviour
                 }
 
                 int total = _sentFrameCount + _droppedFrameCount;
+                int logInterval = LogInterval;
                 if (logInterval > 0 && total > 0 && total % logInterval == 0)
                 {
                     double now = Time.realtimeSinceStartupAsDouble;
@@ -329,7 +222,7 @@ public class PayloadSender : MonoBehaviour
                 }
             }
 
-            float targetIntervalSeconds = 1f / Mathf.Max(1, targetFps);
+            float targetIntervalSeconds = 1f / Mathf.Max(1, TargetFps);
             float elapsedSeconds = (float)(Time.realtimeSinceStartupAsDouble - frameStart);
             float remainingSeconds = targetIntervalSeconds - elapsedSeconds;
 
@@ -342,26 +235,6 @@ public class PayloadSender : MonoBehaviour
                 yield return null;
             }
         }
-    }
-
-    private static bool IsValidTargetFps(int value)
-    {
-        return value is >= 1 and <= 90;
-    }
-
-    private static bool IsValidLogInterval(int value)
-    {
-        return value >= 0;
-    }
-
-    private static bool IsValidHighWatermark(int value)
-    {
-        return value >= 1;
-    }
-
-    private static bool IsValidLingerMs(int value)
-    {
-        return value >= 0;
     }
 
     /// <summary>
