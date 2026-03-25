@@ -195,6 +195,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3fcc195ca6055b24cb15bda64e414559, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Test
+  MyData:
+    a: 1
+    b: hello
+    c: 6666
+  Dict:
+    serializedKvps: []
+    dividerPos: 0.33
 --- !u!4 &798942138
 Transform:
   m_ObjectHideFlags: 0
@@ -406,7 +413,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 114619663520511662, guid: d39ad26c554f1a04d870956f7fac6fd8, type: 3}
       propertyPath: m_exposeFields
-      value: 1
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 114619663520511662, guid: d39ad26c554f1a04d870956f7fac6fd8, type: 3}
       propertyPath: m_exposeProperties
