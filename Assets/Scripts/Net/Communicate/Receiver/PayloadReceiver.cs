@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Threading;
 using NetMQ;
 using NetMQ.Sockets;
+using Proxima;
 using RuntimeInspectorNamespace;
 using UnityEngine;
 using UnityEngine.Events;
@@ -36,6 +37,14 @@ public class PayloadReceiver : MonoBehaviour
     private const string SocketLingerMsPrefKey = "PayloadReceiver.SocketLingerMs";
     private const string ReceivePollTimeoutMsPrefKey = "PayloadReceiver.ReceivePollTimeoutMs";
 
+    [SerializeField] private string serverIP = "127.0.0.1";
+    [SerializeField] private int serverPort = 5556;
+    [SerializeField] private bool useTopic = true;
+    [SerializeField] private string topic = "payload";
+    [SerializeField] private int receiveHighWatermark = 1;
+    [SerializeField] private int socketLingerMs = 0;
+    [SerializeField] private int receivePollTimeoutMs = 100;
+
     private SubscriberSocket _socket;
     private Thread _receiveThread;
     private volatile bool _running;
@@ -45,57 +54,8 @@ public class PayloadReceiver : MonoBehaviour
     private RawPayload _latestPayload;
     private bool _hasNewPayload;
 
-    [ShowInInspector]
-    public string ServerIP
-    {
-        get => PlayerPrefs.GetString(ReceiverIPPrefKey, "127.0.0.1");
-        set => PlayerPrefs.SetString(ReceiverIPPrefKey, value);
-    }
-
-    [ShowInInspector]
-    public int ServerPort
-    {
-        get => PlayerPrefs.GetInt(ReceiverPortPrefKey, 5556);
-        set => PlayerPrefs.SetInt(ReceiverPortPrefKey, value);
-    }
-
-    [ShowInInspector]
-    public bool UseTopic
-    {
-        get => PlayerPrefs.GetInt(ReceiverUseTopicPrefKey, 1) != 0;
-        set => PlayerPrefs.SetInt(ReceiverUseTopicPrefKey, value ? 1 : 0);
-    }
-
-    [ShowInInspector]
-    public string Topic
-    {
-        get => PlayerPrefs.GetString(ReceiverTopicPrefKey, "payload");
-        set => PlayerPrefs.SetString(ReceiverTopicPrefKey, value);
-    }
-
-    [ShowInInspector]
-    public int ReceiveHighWatermark
-    {
-        get => PlayerPrefs.GetInt(ReceiveHighWatermarkPrefKey, 1);
-        set => PlayerPrefs.SetInt(ReceiveHighWatermarkPrefKey, value);
-    }
-
-    [ShowInInspector]
-    public int SocketLingerMs
-    {
-        get => PlayerPrefs.GetInt(SocketLingerMsPrefKey, 0);
-        set => PlayerPrefs.SetInt(SocketLingerMsPrefKey, value);
-    }
-
-    [ShowInInspector]
-    public int ReceivePollTimeoutMs
-    {
-        get => PlayerPrefs.GetInt(ReceivePollTimeoutMsPrefKey, 100);
-        set => PlayerPrefs.SetInt(ReceivePollTimeoutMsPrefKey, value);
-    }
-
     public bool IsConnected => _running && _socket != null;
-    public string ServerAddress => $"tcp://{ServerIP}:{ServerPort}";
+    public string ServerAddress => $"tcp://{serverIP}:{serverPort}";
 
     [Header("Events")]
     public RawPayloadEvent OnPayloadReceived = new RawPayloadEvent();
@@ -106,6 +66,46 @@ public class PayloadReceiver : MonoBehaviour
         {
             OnPayloadReceived = new RawPayloadEvent();
         }
+
+        LoadConfig();
+    }
+
+    [Button("Load Config")]
+    [RuntimeInspectorButton("Load Config", false, ButtonVisibility.InitializedObjects)]
+    [ProximaButton("Load Config")]
+    private void LoadConfig()
+    {
+        serverIP = PlayerPrefs.GetString(ReceiverIPPrefKey, serverIP);
+        serverPort = PlayerPrefs.GetInt(ReceiverPortPrefKey, serverPort);
+        useTopic = PlayerPrefs.GetInt(ReceiverUseTopicPrefKey, useTopic ? 1 : 0) != 0;
+        topic = PlayerPrefs.GetString(ReceiverTopicPrefKey, topic);
+        receiveHighWatermark = PlayerPrefs.GetInt(ReceiveHighWatermarkPrefKey, receiveHighWatermark);
+        socketLingerMs = PlayerPrefs.GetInt(SocketLingerMsPrefKey, socketLingerMs);
+        receivePollTimeoutMs = PlayerPrefs.GetInt(ReceivePollTimeoutMsPrefKey, receivePollTimeoutMs);
+    }
+
+    [Button("Save Config")]
+    [RuntimeInspectorButton("Save Config", false, ButtonVisibility.InitializedObjects)]
+    [ProximaButton("Save Config")]
+    private void SaveConfig()
+    {
+        PlayerPrefs.SetString(ReceiverIPPrefKey, serverIP);
+        PlayerPrefs.SetInt(ReceiverPortPrefKey, serverPort);
+        PlayerPrefs.SetInt(ReceiverUseTopicPrefKey, useTopic ? 1 : 0);
+        PlayerPrefs.SetString(ReceiverTopicPrefKey, topic);
+        PlayerPrefs.SetInt(ReceiveHighWatermarkPrefKey, receiveHighWatermark);
+        PlayerPrefs.SetInt(SocketLingerMsPrefKey, socketLingerMs);
+        PlayerPrefs.SetInt(ReceivePollTimeoutMsPrefKey, receivePollTimeoutMs);
+        PlayerPrefs.Save();
+    }
+
+    [Button("Reconnect")]
+    [RuntimeInspectorButton("Reconnect", false, ButtonVisibility.InitializedObjects)]
+    [ProximaButton("Reconnect")]
+    private void Reconnect()
+    {
+        Disconnect();
+        Connect();
     }
 
     private void Start()
@@ -146,25 +146,17 @@ public class PayloadReceiver : MonoBehaviour
         AsyncIO.ForceDotNet.Force();
 
         _socket = new SubscriberSocket();
-        _socket.Options.ReceiveHighWatermark = ReceiveHighWatermark;
-        _socket.Options.Linger = TimeSpan.FromMilliseconds(SocketLingerMs);
+        _socket.Options.ReceiveHighWatermark = receiveHighWatermark;
+        _socket.Options.Linger = TimeSpan.FromMilliseconds(socketLingerMs);
         _socket.Connect(ServerAddress);
-        _socket.Subscribe(UseTopic ? Topic : string.Empty);
+        _socket.Subscribe(useTopic ? topic : string.Empty);
 
         _running = true;
         _receiveThread = new Thread(ReceiveLoop) { IsBackground = true };
         _receiveThread.Start();
 
-        string subscribeDesc = UseTopic ? $"topic: {Topic}" : "topic: <none>";
+        string subscribeDesc = useTopic ? $"topic: {topic}" : "topic: <none>";
         Debug.Log($"[PayloadReceiver] Connected to {ServerAddress}, {subscribeDesc}");
-    }
-
-    [Button("Reconnect")]
-    [RuntimeInspectorButton("Reconnect", false, ButtonVisibility.InitializedObjects)]
-    private void Reconnect()
-    {
-        Disconnect();
-        Connect();
     }
 
     public void Disconnect()
@@ -194,19 +186,19 @@ public class PayloadReceiver : MonoBehaviour
                 }
 
                 NetMQMessage message = new NetMQMessage();
-                if (!_socket.TryReceiveMultipartMessage(TimeSpan.FromMilliseconds(ReceivePollTimeoutMs), ref message))
+                if (!_socket.TryReceiveMultipartMessage(TimeSpan.FromMilliseconds(receivePollTimeoutMs), ref message))
                 {
                     continue;
                 }
 
-                int minFrames = UseTopic ? 2 : 1;
+                int minFrames = useTopic ? 2 : 1;
                 if (message.FrameCount < minFrames)
                 {
                     continue;
                 }
 
-                int startFrame = UseTopic ? 1 : 0;
-                string receivedTopic = UseTopic ? message[0].ConvertToString() : string.Empty;
+                int startFrame = useTopic ? 1 : 0;
+                string receivedTopic = useTopic ? message[0].ConvertToString() : string.Empty;
 
                 int payloadCount = message.FrameCount - startFrame;
                 byte[][] payloadParts = new byte[payloadCount][];

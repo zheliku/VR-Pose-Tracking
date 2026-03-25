@@ -153,7 +153,7 @@ MonoBehaviour:
   packStereoIntoSingleJpeg: 1
   outputScale: 1
   jpegQuality: 80
-  imageCodec: 1
+  imageCodec: 0
   enableVerboseDebugLog: 1
   debugLogInterval: 30
 --- !u!4 &217519041
@@ -1816,6 +1816,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PayloadSender
   payloadEncoder: {fileID: 217519040}
+  serverIP: 127.0.0.1
+  serverPort: 5557
+  targetFps: 60
+  logInterval: 30
+  sendHighWatermark: 1
+  socketLingerMs: 0
 --- !u!4 &882331661
 Transform:
   m_ObjectHideFlags: 0
@@ -2580,6 +2586,68 @@ MonoBehaviour:
     ReEnterDistance: 0.02
   _closeDistanceThreshold: 0.001
   _tiebreakerScore: 0
+--- !u!1 &1081554898
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1081554900}
+  - component: {fileID: 1081554899}
+  m_Layer: 0
+  m_Name: ProximaInspector
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1081554899
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1081554898}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e277581af68d4604da056e460b819656, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Proxima::Proxima.ProximaInspector
+  _displayName: 666
+  _port: 7759
+  _password: 123
+  _useHttps: 1
+  _certificate: {fileID: 0}
+  _certificatePassword: 
+  _runOnEnable: 1
+  _logBufferSize: 1000
+  _instantiateStatusUI: 1
+  _instantiateConnectUI: 1
+  _dontDestroyOnLoad: 1
+  _setRunInBackground: 1
+  _connectionType: 1
+  _serverUrl: 
+  _debugUrl: http://127.0.0.1:5173
+  _appId: 0
+  _uniqueName: 
+  _uploadLogs: 0
+--- !u!4 &1081554900
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1081554898}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 300.75793, y: 0, z: -224.7894}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1478500957
 GameObject:
   m_ObjectHideFlags: 0
@@ -3576,3 +3644,4 @@ SceneRoots:
   - {fileID: 882331661}
   - {fileID: 217519041}
   - {fileID: 265007996}
+  - {fileID: 1081554900}

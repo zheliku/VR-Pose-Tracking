@@ -1,0 +1,11 @@
+{
+    "displayName": "Proxima Inspector",
+    "description": "Inspect your game's components, logs, performance, and more from the web browser.",
+    "name": "com.virtualmaker.proxima",
+    "unity": "2021.3",
+    "version": "1.6.0",
+    "category": "utilities",
+    "dependencies": {
+        "com.unity.modules.jsonserialize": "1.0.0"
+    }
+}

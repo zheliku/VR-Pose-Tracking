@@ -202,6 +202,7 @@ MonoBehaviour:
   Dict:
     serializedKvps: []
     dividerPos: 0.33
+  tt: 0.14
 --- !u!4 &798942138
 Transform:
   m_ObjectHideFlags: 0
@@ -212,6 +213,68 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0.19998, y: -0, z: 0.05164}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &994024269
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 994024271}
+  - component: {fileID: 994024270}
+  m_Layer: 0
+  m_Name: ProximaInspector
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &994024270
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 994024269}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e277581af68d4604da056e460b819656, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Proxima::Proxima.ProximaInspector
+  _displayName: 123
+  _port: 7759
+  _password: 123
+  _useHttps: 0
+  _certificate: {fileID: 0}
+  _certificatePassword: 
+  _runOnEnable: 1
+  _logBufferSize: 1000
+  _instantiateStatusUI: 1
+  _instantiateConnectUI: 0
+  _dontDestroyOnLoad: 1
+  _setRunInBackground: 1
+  _connectionType: 1
+  _serverUrl: 
+  _debugUrl: http://127.0.0.1:5173
+  _appId: 0
+  _uniqueName: 
+  _uploadLogs: 0
+--- !u!4 &994024271
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 994024269}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 194.53494, y: -0, z: 32.38424}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -384,6 +447,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PayloadSender
   payloadEncoder: {fileID: 354739064}
+  serverIP: 127.0.0.1
+  serverPort: 5557
+  targetFps: 60
+  logInterval: 30
+  sendHighWatermark: 1
+  socketLingerMs: 0
 --- !u!4 &1047791975
 Transform:
   m_ObjectHideFlags: 0
@@ -1101,3 +1170,4 @@ SceneRoots:
   - {fileID: 1426579236}
   - {fileID: 354739065}
   - {fileID: 1047791975}
+  - {fileID: 994024271}

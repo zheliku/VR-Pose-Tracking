@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using NetMQ;
 using NetMQ.Sockets;
+using Proxima;
 using RuntimeInspectorNamespace;
 using UnityEngine;
 using VInspector;
@@ -24,6 +25,12 @@ public class PayloadSender : MonoBehaviour
     private const string SocketLingerMsPrefKey = "PayloadSender.SocketLingerMs";
 
     [SerializeField] private EncoderBase payloadEncoder;
+    [SerializeField] private string serverIP = "127.0.0.1";
+    [SerializeField] private int serverPort = 5557;
+    [SerializeField] private int targetFps = 60;
+    [SerializeField] private int logInterval = 30;
+    [SerializeField] private int sendHighWatermark = 1;
+    [SerializeField] private int socketLingerMs = 0;
 
     private PushSocket _socket;
     private Coroutine _sendCoroutine;
@@ -36,49 +43,7 @@ public class PayloadSender : MonoBehaviour
     private double _encodeTimeAcc;
     private double _sendTimeAcc;
 
-    [ShowInInspector]
-    public string ServerIP
-    {
-        get => PlayerPrefs.GetString(SenderIPPrefKey, "127.0.0.1");
-        set => PlayerPrefs.SetString(SenderIPPrefKey, value);
-    }
-
-    [ShowInInspector]
-    public int ServerPort
-    {
-        get => PlayerPrefs.GetInt(SenderPortPrefKey, 5557);
-        set => PlayerPrefs.SetInt(SenderPortPrefKey, value);
-    }
-
-    [ShowInInspector]
-    public int TargetFps
-    {
-        get => PlayerPrefs.GetInt(TargetFpsPrefKey, 60);
-        set => PlayerPrefs.SetInt(TargetFpsPrefKey, value);
-    }
-
-    [ShowInInspector]
-    public int LogInterval
-    {
-        get => PlayerPrefs.GetInt(LogIntervalPrefKey, 30);
-        set => PlayerPrefs.SetInt(LogIntervalPrefKey, value);
-    }
-
-    [ShowInInspector]
-    public int SendHighWatermark
-    {
-        get => PlayerPrefs.GetInt(SendHighWatermarkPrefKey, 1);
-        set => PlayerPrefs.SetInt(SendHighWatermarkPrefKey, value);
-    }
-
-    [ShowInInspector]
-    public int SocketLingerMs
-    {
-        get => PlayerPrefs.GetInt(SocketLingerMsPrefKey, 0);
-        set => PlayerPrefs.SetInt(SocketLingerMsPrefKey, value);
-    }
-
-    private string Endpoint => $"tcp://{ServerIP}:{ServerPort}";
+    private string Endpoint => $"tcp://{serverIP}:{serverPort}";
 
     /// <summary>
     /// 初始化事件并自动查找同对象编码器。
@@ -89,6 +54,47 @@ public class PayloadSender : MonoBehaviour
         {
             payloadEncoder = GetComponent<EncoderBase>();
         }
+
+        LoadConfig();
+    }
+
+    [Button("Load Config")]
+    [RuntimeInspectorButton("Load Config", false, ButtonVisibility.InitializedObjects)]
+    [ProximaButton("Load Config")]
+    private void LoadConfig()
+    {
+        serverIP = PlayerPrefs.GetString(SenderIPPrefKey, serverIP);
+        serverPort = PlayerPrefs.GetInt(SenderPortPrefKey, serverPort);
+        targetFps = PlayerPrefs.GetInt(TargetFpsPrefKey, targetFps);
+        logInterval = PlayerPrefs.GetInt(LogIntervalPrefKey, logInterval);
+        sendHighWatermark = PlayerPrefs.GetInt(SendHighWatermarkPrefKey, sendHighWatermark);
+        socketLingerMs = PlayerPrefs.GetInt(SocketLingerMsPrefKey, socketLingerMs);
+    }
+
+    [Button("Save Config")]
+    [RuntimeInspectorButton("Save Config", false, ButtonVisibility.InitializedObjects)]
+    [ProximaButton("Save Config")]
+    private void SaveConfig()
+    {
+        PlayerPrefs.SetString(SenderIPPrefKey, serverIP);
+        PlayerPrefs.SetInt(SenderPortPrefKey, serverPort);
+        PlayerPrefs.SetInt(TargetFpsPrefKey, targetFps);
+        PlayerPrefs.SetInt(LogIntervalPrefKey, logInterval);
+        PlayerPrefs.SetInt(SendHighWatermarkPrefKey, sendHighWatermark);
+        PlayerPrefs.SetInt(SocketLingerMsPrefKey, socketLingerMs);
+        PlayerPrefs.Save();
+    }
+
+    /// <summary>
+    /// 地址变更时的重连入口。
+    /// </summary>
+    [Button("Reconnect")]
+    [RuntimeInspectorButton("Reconnect", false, ButtonVisibility.InitializedObjects)]
+    [ProximaButton("Reconnect")]
+    private void Reconnect()
+    {
+        DisconnectSocket();
+        Connect();
     }
 
     /// <summary>
@@ -122,22 +128,11 @@ public class PayloadSender : MonoBehaviour
         AsyncIO.ForceDotNet.Force();
 
         _socket = new PushSocket();
-        _socket.Options.SendHighWatermark = SendHighWatermark;
-        _socket.Options.Linger = TimeSpan.FromMilliseconds(SocketLingerMs);
+        _socket.Options.SendHighWatermark = sendHighWatermark;
+        _socket.Options.Linger = TimeSpan.FromMilliseconds(socketLingerMs);
         _socket.Connect(Endpoint);
 
         Debug.Log($"[PayloadSender] Connected to {Endpoint}");
-    }
-
-    /// <summary>
-    /// 地址变更时的重连入口。
-    /// </summary>
-    [Button("Reconnect")]
-    [RuntimeInspectorButton("Reconnect", false, ButtonVisibility.InitializedObjects)]
-    private void Reconnect()
-    {
-        DisconnectSocket();
-        Connect();
     }
 
     /// <summary>
@@ -199,7 +194,6 @@ public class PayloadSender : MonoBehaviour
                 }
 
                 int total = _sentFrameCount + _droppedFrameCount;
-                int logInterval = LogInterval;
                 if (logInterval > 0 && total > 0 && total % logInterval == 0)
                 {
                     double now = Time.realtimeSinceStartupAsDouble;
@@ -222,7 +216,7 @@ public class PayloadSender : MonoBehaviour
                 }
             }
 
-            float targetIntervalSeconds = 1f / Mathf.Max(1, TargetFps);
+            float targetIntervalSeconds = 1f / Mathf.Max(1, targetFps);
             float elapsedSeconds = (float)(Time.realtimeSinceStartupAsDouble - frameStart);
             float remainingSeconds = targetIntervalSeconds - elapsedSeconds;
 
